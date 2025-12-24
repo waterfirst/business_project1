@@ -1,0 +1,10 @@
+group,viability,replicate
+Control,95.2,1
+Control,93.8,2
+Control,94.5,3
+Treatment A,78.5,1
+Treatment A,80.1,2
+Treatment A,79.3,3
+Treatment B,65.3,1
+Treatment B,67.9,2
+Treatment B,66.5,3
