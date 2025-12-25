@@ -39,24 +39,26 @@ class BioCodeGenerator:
 당신은 생명과학 실험 데이터 분석 전문가입니다.
 사용자의 자연어 설명을 **실행 가능한** R 또는 Python 코드로 변환합니다.
 
-**핵심 규칙:**
-1. 코드는 Quarto 문서(.qmd)에서 실행되므로 반드시 유효한 구문만 포함
-2. 통계 검정 시 반드시 가정 검증 단계 포함 (정규성, 등분산성)
-3. 시각화는 publication-quality로 (가독성 높은 폰트와 레이블)
-4. 모든 코드는 반드시 주석(#)을 포함하여 줄바꿈을 지키며 작성
-5. 데이터 파일명은 'data.csv'로 가정
-6. 다른 설명 텍스트는 절대 코드 블록 안에 넣지 말 것
+**핵심 분석 가이드라인:**
+1. 코드는 반드시 유효한 Python/R 문법이어야 함
+2. 모든 설명(예: "1. 라이브러리 임포트")은 반드시 주석(#)으로 처리하거나 코드 블록 밖에 작성
+3. 한 줄에 하나의 명령문만 작성 (절대 여러 import를 한 줄에 나열하지 말 것)
+4. 데이터 로드는 반드시 `df = pd.read_csv('data.csv')` 형식을 따를 것
 
-**응답 형식:**
-반드시 아래 형식의 마크다운 블록으로 응답하세요:
-
+**응답 필수 형식 (Few-Shot):**
 1. **코드:**
 ```{언어}
-# 여기에 순수 코드만 작성 (설명 텍스트 포함 금지)
+# 1. 라이브러리 로드
+import pandas as pd
+import seaborn as sns
+
+# 2. 데이터 분석
+df = pd.read_csv('data.csv')
+print(df.describe())
 ```
 
 2. **해석:**
-결과 분석 요약
+분석 결과에 대한 전문가적 견해
 """
     
     def generate_analysis_code(
@@ -109,58 +111,64 @@ class BioCodeGenerator:
             response = self.model.generate_content(prompt)
             full_text = response.text
             
-            # [단계 1] 백틱 블록 추출 (가장 우선)
+            # [단계 1] 마크다운 코드 블록 추출
             code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
             code_matches = re.findall(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
+            code = max(code_matches, key=len).strip() if code_matches else full_text
             
-            if code_matches:
-                # 가장 긴 블록을 코드로 선택 (가장 완전할 가능성이 높음)
-                code = max(code_matches, key=len).strip()
-            else:
-                # [단계 2] 백틱이 없는 경우 "코드:" 섹션 이후부터 "해석:" 이전까지 추출
-                sect_pattern = r"\*\*코드:\*\*(.*?)(?:\*\*해석:\*\*|$)"
-                sect_match = re.search(sect_pattern, full_text, re.DOTALL | re.IGNORECASE)
-                if sect_match:
-                    code = sect_match.group(1).strip()
-                else:
-                    # [단계 3] 최후의 수단: 전체 텍스트
-                    code = full_text.strip()
-            
-            # [단계 4] 코드 정제 (남은 마커 제거 및 개행 복구)
-            # 모든 유형의 백틱/언어 마커 제거
+            # [단계 2] 불필요한 마커 제거
             code = re.sub(r"```[a-zA-Z]*", "", code)
             code = code.replace("```", "").strip()
             
-            # [결정적 해결] 플랫폼 독립적 개행 및 공백 처리
-            # 1. 모든 개행문자를 \n으로 통합
-            # 2. mashed lines 방지를 위해 각 라인을 개별 처리
+            # [단계 3] Mash-Unfolder: 한 줄에 뭉친 코드 분리 및 텍스트 주석 처리
             clean_lines = []
             for line in code.splitlines():
                 l = line.strip()
-                if l:
-                    # "1. 라이브러리 임포트" 같은 텍스트가 코드 줄에 섞여 있는 경우 주석 처리 감지
-                    # 만약 줄이 숫자로 시작하고 코드가 아닌 것 같으면 주석 처리
-                    if re.match(r"^\d+\.", l) and not ("import " in l or "=" in l or "(" in l):
-                        l = f"# {l}"
-                    clean_lines.append(l)
-                else:
+                if not l:
                     clean_lines.append("")
+                    continue
+                
+                # 1. "1. 제목 import ..." 패턴 처리: 제목과 코드를 강제 분리
+                # 'import', 'from', 'df =', 'plt.' 등의 키워드 앞에서 줄바꿈 시도
+                split_keywords = ['import ', 'from ', 'df =', 'plt.', 'sns.', 'print(', 'model =', 'results =']
+                for kw in split_keywords:
+                    if kw in l and not l.startswith(kw) and not l.startswith("#"):
+                        # 키워드 앞에서 자름
+                        parts = l.split(kw, 1)
+                        header = parts[0].strip()
+                        body = kw + parts[1]
+                        
+                        # 헤더가 있고 주석이 아니면 주석처리
+                        if header and not header.startswith("#"):
+                            clean_lines.append(f"# {header}")
+                        l = body # 남은 부분으로 계속 처리
+                
+                # 2. 숫자형 리스트(1. 2. ...) 및 설명 텍스트 주석 처리
+                if re.match(r"^\d+\.", l) and not l.startswith("#"):
+                    l = f"# {l}"
+                
+                # 3. 한 줄에 여러 import가 붙어 있는 경우 (결정적 해결)
+                # 'import pandas as pd import numpy as np' -> 분리
+                if "import " in l and l.count("import ") > 1:
+                    sub_parts = l.split("import ")
+                    for p in sub_parts:
+                        if p.strip():
+                            clean_lines.append(f"import {p.strip()}")
+                    continue
+
+                clean_lines.append(l)
             
-            code = "\n".join(clean_lines)
+            final_code = "\n".join(clean_lines)
             
-            # [단계 5] 해석/주의사항 추출
-            interpretation = ""
+            # [단계 4] 결과 해석 추출
             interp_match = re.search(r"\*\*해석:\*\*(.*?)(?:\*\*주의사항:\*\*|$)", full_text, re.DOTALL | re.IGNORECASE)
-            if interp_match:
-                interpretation = interp_match.group(1).strip()
+            interpretation = interp_match.group(1).strip() if interp_match else ""
             
-            warnings = ""
             warn_match = re.search(r"\*\*주의사항:\*\*(.*?)$", full_text, re.DOTALL | re.IGNORECASE)
-            if warn_match:
-                warnings = warn_match.group(1).strip()
+            warnings = warn_match.group(1).strip() if warn_match else ""
             
             return {
-                'code': code,
+                'code': final_code,
                 'interpretation': interpretation,
                 'warnings': warnings,
                 'raw_response': full_text
