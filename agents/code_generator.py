@@ -23,14 +23,15 @@ class BioCodeGenerator:
         
         genai.configure(api_key=api_key)
         
-        # 모델 초기화
+        # 모델 초기화 (JSON 모드 지원을 위해 config 확장)
         self.model = genai.GenerativeModel(
             model_name=model_name,
             generation_config={
-                "temperature": 0.3,
+                "temperature": 0.2, # Lower temperature for more stable code
                 "top_p": 0.95,
                 "top_k": 40,
                 "max_output_tokens": 8192,
+                "response_mime_type": "application/json"
             }
         )
         
@@ -45,20 +46,14 @@ class BioCodeGenerator:
 3. 한 줄에 하나의 명령문만 작성 (절대 여러 import를 한 줄에 나열하지 말 것)
 4. 데이터 로드는 반드시 `df = pd.read_csv('data.csv')` 형식을 따를 것
 
-**응답 필수 형식 (Few-Shot):**
-1. **코드:**
-```{언어}
-# 1. 라이브러리 로드
-import pandas as pd
-import seaborn as sns
-
-# 2. 데이터 분석
-df = pd.read_csv('data.csv')
-print(df.describe())
-```
-
-2. **해석:**
-분석 결과에 대한 전문가적 견해
+**응답 필수 형식 (JSON):**
+반드시 아래 키를 포함한 유효한 JSON 객체로만 응답하세요:
+{
+  "code": "실행 가능한 분석 코드 (개행 필수, 뭉치지 말 것)",
+  "interpretation": "분석 결과에 대한 전문가적 해석",
+  "warnings": "분석 시 주의사항"
+}
+JSON 외의 다른 텍스트는 절대 포함하지 마세요.
 """
     
     def generate_analysis_code(
@@ -108,74 +103,118 @@ print(df.describe())
 """
         
         try:
-            response = self.model.generate_content(prompt)
+            # JSON 모드를 명시적으로 요청하는 프롬프트 습합
+            json_prompt = prompt + "\n\nIMPORTANT: Respond strictly in JSON format."
+            response = self.model.generate_content(json_prompt)
             full_text = response.text
             
-            # [단계 1] 마크다운 코드 블록 추출
-            code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
-            code_matches = re.findall(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
-            code = max(code_matches, key=len).strip() if code_matches else full_text
-            
-            # [단계 2] 불필요한 마커 제거
-            code = re.sub(r"```[a-zA-Z]*", "", code)
-            code = code.replace("```", "").strip()
-            
-            # [단계 3] Mash-Unfolder: 한 줄에 뭉친 코드 분리 및 텍스트 주석 처리
-            clean_lines = []
-            for line in code.splitlines():
-                l = line.strip()
-                if not l:
-                    clean_lines.append("")
-                    continue
+            # JSON 파싱
+            import json
+            try:
+                data = json.loads(full_text)
+                code = data.get('code', '')
+                interpretation = data.get('interpretation', '')
+                warnings = data.get('warnings', '')
+            except json.JSONDecodeError:
+                #Fallback: 기존의 텍스트 파싱 로직 (만약 JSON 모드가 실패할 경우 대비)
+                code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
+                code_matches = re.findall(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
+                code = max(code_matches, key=len).strip() if code_matches else full_text
                 
-                # 1. "1. 제목 import ..." 패턴 처리: 제목과 코드를 강제 분리
-                # 'import', 'from', 'df =', 'plt.' 등의 키워드 앞에서 줄바꿈 시도
-                split_keywords = ['import ', 'from ', 'df =', 'plt.', 'sns.', 'print(', 'model =', 'results =']
-                for kw in split_keywords:
-                    if kw in l and not l.startswith(kw) and not l.startswith("#"):
-                        # 키워드 앞에서 자름
-                        parts = l.split(kw, 1)
-                        header = parts[0].strip()
-                        body = kw + parts[1]
-                        
-                        # 헤더가 있고 주석이 아니면 주석처리
-                        if header and not header.startswith("#"):
-                            clean_lines.append(f"# {header}")
-                        l = body # 남은 부분으로 계속 처리
-                
-                # 2. 숫자형 리스트(1. 2. ...) 및 설명 텍스트 주석 처리
-                if re.match(r"^\d+\.", l) and not l.startswith("#"):
-                    l = f"# {l}"
-                
-                # 3. 한 줄에 여러 import가 붙어 있는 경우 (결정적 해결)
-                # 'import pandas as pd import numpy as np' -> 분리
-                if "import " in l and l.count("import ") > 1:
-                    sub_parts = l.split("import ")
-                    for p in sub_parts:
-                        if p.strip():
-                            clean_lines.append(f"import {p.strip()}")
-                    continue
+                interp_match = re.search(r'"interpretation":\s*"(.*?)"', full_text, re.DOTALL)
+                interpretation = interp_match.group(1) if interp_match else ""
+                warnings = ""
 
-                clean_lines.append(l)
-            
-            final_code = "\n".join(clean_lines)
-            
-            # [단계 4] 결과 해석 추출
-            interp_match = re.search(r"\*\*해석:\*\*(.*?)(?:\*\*주의사항:\*\*|$)", full_text, re.DOTALL | re.IGNORECASE)
-            interpretation = interp_match.group(1).strip() if interp_match else ""
-            
-            warn_match = re.search(r"\*\*주의사항:\*\*(.*?)$", full_text, re.DOTALL | re.IGNORECASE)
-            warnings = warn_match.group(1).strip() if warn_match else ""
+            # [핵심] 코드 정밀 세척 (Detox)
+            code = self._detox_code(code, language)
             
             return {
-                'code': final_code,
+                'code': code,
                 'interpretation': interpretation,
                 'warnings': warnings,
                 'raw_response': full_text
             }
             
         except Exception as e:
-            raise RuntimeError(f"Gemini API 호출 실패: {str(e)}")
+            raise RuntimeError(f"Gemini API 호출 및 데이터 처리 실패: {str(e)}")
+
+    def _detox_code(self, code: str, language: str) -> str:
+        """뭉친 코드 분해 및 텍스트 자동 주석 처리 (v4.3)"""
+        if not code: return ""
+        
+        # 1. 문자열 정규화
+        code = code.replace("```", "").strip()
+        
+        # 2. 분리 키워드 정의
+        # Python/R 주요 키워드 및 패턴
+        split_keywords = [
+            'import ', 'from ', 'df =', 'plt.', 'sns.', 'print(', 
+            'model =', 'results =', 'stats.', 'sm.', 'ols(', 
+            'pairwise_tukeyhsd(', 'pd.', 'np.', 'ggplot(', 'library(', 
+            'if ', 'for ', 'def ', 'class ', 'try:', 'except:'
+        ]
+        
+        clean_lines = []
+        for line in code.splitlines():
+            l = line.strip()
+            if not l:
+                clean_lines.append("")
+                continue
+            
+            # [Aggressive Unfolding] 한 줄에 여러 키워드가 뭉친 경우 분해
+            current_line = l
+            while True:
+                found_kw = None
+                earliest_pos = len(current_line)
+                
+                # 가장 먼저 나타나는 키워드 찾기 (단, 줄 시작은 제외)
+                for kw in split_keywords:
+                    pos = current_line.find(kw)
+                    if pos > 0: # 줄 중간에 키워드가 있는 경우
+                        if pos < earliest_pos:
+                            earliest_pos = pos
+                            found_kw = kw
+                
+                if found_kw:
+                    # 키워드 앞에서 자르기
+                    prefix = current_line[:earliest_pos].strip()
+                    remainder = current_line[earliest_pos:].strip()
+                    
+                    # 프리픽스가 주석이 아니고 코드가 아니면 주석 처리
+                    if prefix and not prefix.startswith("#"):
+                        # 프리픽스가 순수 텍스트(한글 포함)인지 확인
+                        if not any(k in prefix for k in split_keywords) and not ("=" in prefix or "(" in prefix):
+                            clean_lines.append(f"# {prefix}")
+                        else:
+                            clean_lines.append(prefix)
+                    
+                    current_line = remainder
+                else:
+                    # 더 이상 찢을 키워드가 없음
+                    if current_line and not current_line.startswith("#"):
+                        # 숫자로 시작하거나 한글이 포함된 설명글인 경우 주석 처리
+                        if re.match(r"^[0-9\.\s]+", current_line) or re.search(r'[가-힣]', current_line):
+                             if not ("import " in current_line or "from " in current_line or "=" in current_line):
+                                 current_line = f"# {current_line}"
+                    clean_lines.append(current_line)
+                    break
+                    
+        # 3. 중복된 import 분해 (import a import b -> import a \n import b)
+        final_lines = []
+        for line in clean_lines:
+            if line.count("import ") > 1 and not line.startswith("#"):
+                parts = line.split("import ")
+                for p in parts:
+                    if p.strip(): final_lines.append(f"import {p.strip()}")
+            elif line.count("library(") > 1 and not line.startswith("#"):
+                parts = line.split("library(")
+                for p in parts:
+                    if p.strip(): final_lines.append(f"library({p.strip()}")
+            else:
+                final_lines.append(line)
+                
+                
+        return "\n".join(final_lines)
     
     def generate_with_context(
         self,
