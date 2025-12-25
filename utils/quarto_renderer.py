@@ -37,43 +37,66 @@ class QuartoRenderer:
         
         # Professional CSS for the report
         custom_css = textwrap.dedent("""
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code&display=swap');
+
+            :root {
+              --primary: #004e92;
+              --secondary: #000428;
+              --accent: #fdbb2d;
+              --text: #2d3436;
+              --bg: #ffffff;
+            }
 
             body {
-              font-family: 'Inter', system-ui, -apple-system, sans-serif;
-              line-height: 1.6;
-              color: #2c3e50;
+              font-family: 'Inter', -apple-system, system-ui, sans-serif;
+              color: var(--text);
+              background-color: var(--bg);
+              line-height: 1.7;
             }
 
             .quarto-title-block .quarto-title-banner {
-              background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-              padding: 4rem 0;
-              color: white;
-              margin-bottom: 2rem;
-              border-radius: 0 0 20px 20px;
+              background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+              padding: 5rem 0;
+              margin-bottom: 3rem;
+              border-radius: 0 0 30px 30px;
+              box-shadow: 0 10px 30px rgba(0,0,0,0.15);
             }
 
             .abstract-box {
-              background: #f8f9fa;
-              padding: 2rem;
-              border-radius: 15px;
-              border-left: 8px solid #3498db;
-              margin-bottom: 3rem;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+              background: #f8faff;
+              padding: 2.5rem;
+              border-radius: 20px;
+              border-left: 10px solid var(--primary);
+              margin-bottom: 4rem;
+              box-shadow: 0 15px 45px rgba(0,0,0,0.04);
             }
 
             h2 {
-              color: #1a2a6c;
-              border-bottom: 3px solid #fdbb2d;
-              padding-bottom: 0.5rem;
-              margin-top: 3rem;
-              font-weight: 600;
+              color: var(--secondary);
+              border-bottom: 4px solid var(--accent);
+              display: inline-block;
+              padding-bottom: 5px;
+              margin-top: 4rem;
+              font-weight: 700;
+              letter-spacing: -0.5px;
             }
 
-            .callout {
-              border-radius: 15px !important;
-              border: none !important;
-              box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            .callout-note.callout {
+              border-left-color: var(--primary) !important;
+              background-color: #f1f7ff !important;
+              border-radius: 12px !important;
+              padding: 1.5rem !important;
+            }
+
+            pre, code {
+              font-family: 'Fira Code', monospace !important;
+              font-size: 0.95em !important;
+            }
+
+            .card-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
             }
         """).strip()
         
@@ -378,12 +401,16 @@ class QuartoRenderer:
             lines.append("```")
             lines.append("")
             
-            # Interpretation
+            # Interpretation - Using cleaner formatting
             if interpretation:
-                lines.append('::: {.callout-note appearance="simple"}')
-                lines.append("### 💡 결과 해석 및 임상적 의미")
                 lines.append("")
-                lines.append(interpretation)
+                lines.append("::: {.callout-note icon=false}")
+                lines.append("### 🧬 분석 통찰 및 결과 해석")
+                lines.append("")
+                # Clean interpretation text to ensure it doesn't break Callout blocks
+                clean_interp = interpretation.strip()
+                # Ensure each line is part of the callout (Quarto needs triple colons to wrap content)
+                lines.append(clean_interp)
                 lines.append(":::")
                 lines.append("")
             
