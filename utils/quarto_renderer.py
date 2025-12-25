@@ -60,54 +60,54 @@ execute:
   message: false
 ---
 
-```{css, echo=FALSE}
+```{{css, echo=FALSE}}
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono&display=swap');
 
-body {
+body {{
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   line-height: 1.6;
-}
+}}
 
-.quarto-title-block .quarto-title-banner {
+.quarto-title-block .quarto-title-banner {{
   background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
   padding-top: 3em;
   padding-bottom: 2em;
   color: white;
-}
+}}
 
-.quarto-title-meta {
+.quarto-title-meta {{
   border-top: 1px solid #eee;
   padding-top: 1em;
-}
+}}
 
-h2 {
+h2 {{
   border-bottom: 2px solid #3498db;
   padding-bottom: 0.3em;
   margin-top: 1.5em;
   font-weight: 600;
-}
+}}
 
-.callout {
+.callout {{
   border-radius: 8px;
   border-left-width: 5px;
-}
+}}
 ```
 
 """
         
         abstract = f"""
 
-## 실험 개요 {.unnumbered}
+## 실험 개요 {{.unnumbered}}
 
-::: {.grid}
+::: {{.grid}}
 
-::: {.g-col-6}
+::: {{.g-col-6}}
 - **실험 제목**: {title}
 - **실험자**: {author}
 - **실험 날짜**: {experiment_date}
 :::
 
-::: {.g-col-6}
+::: {{.g-col-6}}
 - **분석 도구**: Bio-Log v2.1
 - **엔진**: Google Gemini 2.5
 - **총 분석 수**: {len(code_chunks)}개
@@ -143,7 +143,7 @@ h2 {
             
             if interpretation:
                 content += f"""
-::: {.callout-note appearance="simple"}
+::: {{.callout-note appearance="simple"}}
 ### 💡 결과 해석
 
 {interpretation}
