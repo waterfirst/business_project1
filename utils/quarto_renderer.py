@@ -158,9 +158,9 @@ class QuartoRenderer:
         lines.append("execute:")
         lines.append("  warning: false")
         lines.append("  message: false")
-        lines.append("  echo: false")  # Hide code, show only results
+        lines.append("  echo: true")   # Show code by default (user can fold it)
         lines.append("  eval: true")   # Enable execution to show results
-        lines.append("  output: true") # Show output (tables, plots, etc.)
+        lines.append("  output: true") # Show output
         lines.append("---")
         lines.append("")
         lines.append("")
@@ -231,8 +231,8 @@ class QuartoRenderer:
             lines.append("#| include: true") # Include output even if errors occur
             # For Python plots to display properly
             if lang == 'python':
-                lines.append("#| fig-width: 10")
-                lines.append("#| fig-height: 6")
+                lines.append("#| fig-width: 12")
+                lines.append("#| fig-height: 8")
                 lines.append("#| fig-dpi: 300")
             
             # Add data loading and setup if data file is provided
