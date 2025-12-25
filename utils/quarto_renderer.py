@@ -71,7 +71,7 @@ h2 {
 """
         # Write CSS to a file to avoid YAML indentation issues
         css_path = self.temp_dir / "custom_style.css"
-        css_path.write_text(custom_css, encoding='utf-8')
+        css_path.write_text(custom_css, encoding='utf-8-sig')
 
         yaml_header = f"""---
 title: "{title}"
@@ -155,7 +155,8 @@ execute:
 
 """
             
-            content += f"""```{{{lang}}}
+            content += f"""
+```{lang}
 #| label: fig-analysis-{i}
 #| fig-cap: "{caption}"
 
@@ -194,7 +195,7 @@ execute:
             output_path = Path(output_path)
         
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(content, encoding='utf-8')
+        output_path.write_text(content, encoding='utf-8-sig')
         
         return output_path
     

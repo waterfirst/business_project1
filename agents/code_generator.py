@@ -109,9 +109,17 @@ class BioCodeGenerator:
             full_text = response.text
             
             # 코드 블록 추출
-            code_pattern = f"```{language}(.*?)```"
+            code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
             code_match = re.search(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
-            code = code_match.group(1).strip() if code_match else full_text
+            
+            if code_match:
+                code = code_match.group(1).strip()
+            else:
+                # 백틱 없이 코드가 왔을 경우를 대비해 텍스트 클리닝
+                code = full_text.strip()
+                # 혹시라도 포함된 백틱 제거
+                code = re.sub(r"^```[a-zA-Z]*\n", "", code)
+                code = re.sub(r"```$", "", code).strip()
             
             # 해석 부분 추출
             interpretation_pattern = r"\*\*해석:\*\*(.*?)(?:\*\*주의사항:\*\*|$)"
