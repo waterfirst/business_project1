@@ -22,16 +22,64 @@ class QuartoRenderer:
     ) -> Path:
         """Quarto 문서 생성"""
         
+        # Determine processing engine based on language
+        is_r = any(chunk.get('language', '').lower() == 'r' for chunk in code_chunks)
+        engine_section = "engine: knitr" if is_r else "jupyter: python3"
+        
+        # Professional CSS for the report
+        custom_css = """
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono&display=swap');
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+}
+
+.quarto-title-block .quarto-title-banner {
+  background: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%);
+  padding: 3rem 0;
+  color: white;
+  margin-bottom: 2rem;
+}
+
+.quarto-title-meta {
+  border-top: 1px solid #eee;
+  padding-top: 1.5rem;
+  margin-top: 1rem;
+}
+
+h2 {
+  color: #2c3e50;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 0.5rem;
+  margin-top: 2.5rem;
+}
+
+.callout {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.abstract-box {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border-left: 5px solid #3498db;
+  margin-bottom: 2rem;
+}
+"""
+        
         yaml_header = f"""---
 title: "{title}"
 subtitle: "AI-Powered Bio-Data Analysis Insights"
 author: "{author}"
 date: "{experiment_date}"
 lang: ko
+{engine_section}
 format:
   html:
     theme:
-      light: [flatly, custom.scss]
+      light: flatly
       dark: darkly
     code-fold: {"true" if code_fold else "false"}
     code-tools: true
@@ -43,9 +91,14 @@ format:
     highlight-style: monokai
     number-sections: true
     fig-cap-location: bottom
-    margin-left: 20px
-    margin-right: 20px
+    df-print: paged
     embed-resources: true
+    html-math-method: katex
+    include-in-header:
+      text: |
+        <style>
+        {custom_css.strip()}
+        </style>
   pdf:
     documentclass: article
     geometry: 
@@ -54,63 +107,33 @@ format:
     number-sections: true
     colorlinks: true
     mainfont: "NanumGothic"
-jupyter: python3
 execute:
   warning: false
   message: false
 ---
 
-```{{css, echo=FALSE}}
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono&display=swap');
-
-body {{
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  line-height: 1.6;
-}}
-
-.quarto-title-block .quarto-title-banner {{
-  background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
-  padding-top: 3em;
-  padding-bottom: 2em;
-  color: white;
-}}
-
-.quarto-title-meta {{
-  border-top: 1px solid #eee;
-  padding-top: 1em;
-}}
-
-h2 {{
-  border-bottom: 2px solid #3498db;
-  padding-bottom: 0.3em;
-  margin-top: 1.5em;
-  font-weight: 600;
-}}
-
-.callout {{
-  border-radius: 8px;
-  border-left-width: 5px;
-}}
-```
-
 """
         
         abstract = f"""
 
-## 실험 개요 {{.unnumbered}}
+## 실험 요약 및 컨텍스트 {{.unnumbered}}
+
+::: {{.abstract-box}}
 
 ::: {{.grid}}
 
 ::: {{.g-col-6}}
 - **실험 제목**: {title}
-- **실험자**: {author}
-- **실험 날짜**: {experiment_date}
+- **책임 연구원**: {author}
+- **실험 일시**: {experiment_date}
 :::
 
 ::: {{.g-col-6}}
-- **분석 도구**: Bio-Log v2.1
-- **엔진**: Google Gemini 2.5
-- **총 분석 수**: {len(code_chunks)}개
+- **분석 시스템**: Bio-Log v2.2
+- **지능형 엔진**: Google Gemini 2.5
+- **수행된 분석**: 총 {len(code_chunks)}개의 분석 세트
+:::
+
 :::
 
 :::
@@ -153,8 +176,8 @@ h2 {{
             
             content += "\n---\n\n"
         
-        content += """
-## 결론 및 제언 {.unnumbered}
+        content += f"""
+## 결론 및 제언 {{.unnumbered}}
 
 본 분석은 Google Gemini AI를 활용하여 자동 생성되었습니다. 
 통계적 결과는 실험 설계와 데이터 품질에 따라 달라질 수 있으므로, 
