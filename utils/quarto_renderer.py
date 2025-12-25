@@ -61,7 +61,7 @@ execute:
 - **실험 제목**: {title}
 - **실험자**: {author}
 - **실험 날짜**: {experiment_date}
-- **분석 도구**: Bio-Log v2.0 (Google Gemini 1.5)
+- **분석 도구**: Bio-Log v2.0 (Google Gemini 2.0)
 - **총 분석 수**: {len(code_chunks)}개
 
 ---
@@ -131,7 +131,8 @@ execute:
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=60
+                timeout=60,
+                cwd=str(qmd_path.parent)
             )
             
             html_path = qmd_path.with_suffix('.html')
@@ -144,7 +145,12 @@ execute:
         except subprocess.TimeoutExpired:
             raise RuntimeError("렌더링 시간 초과 (60초)")
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Quarto 렌더링 실패:\n{e.stderr}")
+            error_msg = f"Quarto 렌더링 실패 (exit code {e.returncode}):\n"
+            if e.stdout:
+                error_msg += f"--- STDOUT ---\n{e.stdout}\n"
+            if e.stderr:
+                error_msg += f"--- STDERR ---\n{e.stderr}\n"
+            raise RuntimeError(error_msg)
         except FileNotFoundError:
             raise RuntimeError("Quarto가 설치되어 있지 않습니다. https://quarto.org 에서 설치하세요.")
     
@@ -157,7 +163,8 @@ execute:
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=120
+                timeout=120,
+                cwd=str(qmd_path.parent)
             )
             
             pdf_path = qmd_path.with_suffix('.pdf')
@@ -174,4 +181,9 @@ execute:
                     "TinyTeX 설치: quarto install tinytex"
                 )
             else:
-                raise RuntimeError(f"PDF 렌더링 실패:\n{e.stderr}")
+                error_msg = f"PDF 렌더링 실패 (exit code {e.returncode}):\n"
+                if e.stdout:
+                    error_msg += f"--- STDOUT ---\n{e.stdout}\n"
+                if e.stderr:
+                    error_msg += f"--- STDERR ---\n{e.stderr}\n"
+                raise RuntimeError(error_msg)

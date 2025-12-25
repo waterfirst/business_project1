@@ -10,11 +10,11 @@ load_dotenv()
 class BioCodeGenerator:
     """Google Gemini를 활용한 바이오 실험 코드 생성기"""
     
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, model_name: str = "gemini-2.5-flash"):
         """
         Args:
-            model_name: 'gemini-1.5-flash' (빠름, 무료) 또는 
-                       'gemini-1.5-pro' (정교함, 유료)
+            model_name: 'gemini-2.0-flash' (빠름, 추천) 또는 
+                       'gemini-2.5-flash' (비전 가능)
         """
         # API 키 설정
         api_key = os.getenv("GOOGLE_API_KEY")

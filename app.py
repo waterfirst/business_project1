@@ -17,7 +17,7 @@ st.set_page_config(
 # 세션 상태 초기화
 if 'generator' not in st.session_state:
     try:
-        st.session_state.generator = BioCodeGenerator(model_name="gemini-1.5-flash")
+        st.session_state.generator = BioCodeGenerator(model_name="gemini-2.5-flash")
         st.session_state.model_loaded = True
     except Exception as e:
         st.session_state.model_loaded = False
@@ -65,8 +65,8 @@ with st.sidebar:
     
     model_choice = st.selectbox(
         "Gemini 모델",
-        ["gemini-1.5-flash (추천)", "gemini-1.5-pro"],
-        help="Flash: 빠르고 무료 / Pro: 정교하지만 유료"
+        ["gemini-2.5-flash (추천)", "gemini-2.0-flash"],
+        help="2.5 Flash: 비전 및 일반 작업 최적화 / 2.0 Flash: 최신 모델 (할당량 주의)"
     )
     
     language = st.selectbox("분석 언어", ["Python", "R"])
@@ -301,6 +301,6 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.caption("Bio-Log v2.0 (Google Cloud Edition)")
 with col2:
-    st.caption("Powered by Google Gemini 1.5")
+    st.caption("Powered by Google Gemini 2.5")
 with col3:
     st.caption("Team Anti-Gravity © 2025")
