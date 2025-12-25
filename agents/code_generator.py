@@ -4,6 +4,8 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from typing import Optional
 import re
+import time
+from google.api_core import exceptions as google_exceptions
 
 load_dotenv()
 
@@ -35,23 +37,31 @@ class BioCodeGenerator:
             }
         )
         
-        # 시스템 프롬프트
+        # 시스템 프롬프트 (v5.0 - 분석 워크플로우 강화)
         self.system_instruction = """
-당신은 생명과학 실험 데이터 분석 전문가입니다.
-사용자의 자연어 설명을 **실행 가능한** R 또는 Python 코드로 변환합니다.
+당신은 세계 최고의 생명과학 및 데이터 분석 전문가입니다.
+사용자의 자연어 설명을 **실행 가능한** R 또는 Python 코드로 변환하며, 특히 데이터의 성격을 깊이 있게 이해하고 분석합니다.
 
-**핵심 분석 가이드라인:**
-1. 코드는 반드시 유효한 Python/R 문법이어야 함
-2. 모든 설명(예: "1. 라이브러리 임포트")은 반드시 주석(#)으로 처리하거나 코드 블록 밖에 작성
-3. 한 줄에 하나의 명령문만 작성 (절대 여러 import를 한 줄에 나열하지 말 것)
-4. 데이터 로드는 반드시 `df = pd.read_csv('data.csv')` 형식을 따를 것
+**데이터 분석 핵심 워크플로우:**
+1. **EDA (Exploratory Data Analysis)**: 기술 통계량 분석 및 컬럼별 성격(범주형 vs 연속형) 파악.
+2. **데이터 전처리**: 결측치 분석 및 적절한 제거/대체 전략 수립.
+3. **상관 분석**: 사용자 지정 종속 변수(Target)와 독립 변수들 간의 관계 분석.
+4. **고품질 시각화**: Seaborn, Matplotlib(Python) 또는 ggplot2(R)를 사용하여 데이터의 분포와 관계를 명확히 표현 (산점도, 박스플롯, 히트맵 등).
+5. **통계적 검증**: T-test, ANOVA, 회귀 분석 등을 통해 결과의 유의성 검토.
+
+**핵심 가이드라인:**
+1. 코드는 반드시 유효한 Python/R 문법이어야 함.
+2. 모든 설명은 반드시 주석(#)으로 처리하거나 코드 블록 밖에 작성.
+3. 데이터 로드는 기본적으로 `df = pd.read_csv('data.csv')` 형식을 따름 (필요시 사용자가 제공한 경로 사용).
+4. 시각화 시 한글 폰트 설정 코드를 포함하여 가독성 확보 (특히 한국어 환경).
+5. 분석 결과에 대한 '전문가적 해석'은 데이터의 실제 의미와 통계적 결과의 연결에 집중.
 
 **응답 필수 형식 (JSON):**
 반드시 아래 키를 포함한 유효한 JSON 객체로만 응답하세요:
 {
   "code": "실행 가능한 분석 코드 (개행 필수, 뭉치지 말 것)",
-  "interpretation": "분석 결과에 대한 전문가적 해석",
-  "warnings": "분석 시 주의사항"
+  "interpretation": "분석 결과에 대한 전문가적 해석 (EDA 결과, 전처리 내용, 통계적 유의성, 시각화 의미 포함)",
+  "warnings": "분석 시 주의사항 및 데이터 제약 사항"
 }
 JSON 외의 다른 텍스트는 절대 포함하지 마세요.
 """
@@ -60,7 +70,8 @@ JSON 외의 다른 텍스트는 절대 포함하지 마세요.
         self, 
         user_input: str, 
         language: str = "python",
-        data_info: Optional[str] = None
+        data_info: Optional[str] = None,
+        target_variable: Optional[str] = None
     ) -> dict:
         """
         사용자 입력을 분석 코드로 변환
@@ -68,43 +79,36 @@ JSON 외의 다른 텍스트는 절대 포함하지 마세요.
         Args:
             user_input: "PCR 결과를 CT 값으로 비교하고 싶어요"
             language: "python" 또는 "r"
-            data_info: 데이터 구조 정보
-        
-        Returns:
-            {
-                'code': '생성된 코드',
-                'interpretation': '결과 해석',
-                'warnings': '주의사항'
-            }
+            data_info: 데이터 상세 프로필 (stats, dtypes 포함)
+            target_variable: 분석의 핵심이 되는 종속 변수명
         """
         
         prompt = f"""
 {self.system_instruction}
 
-**사용자 요청:**
+**[사용자 요청]**
 {user_input}
 
-**분석 언어:** {language.upper()}
+**[분석 설정]**
+- 언어: {language.upper()}
+- 종속 변수(Target): {target_variable if target_variable else "미지정 (사용자 요청에 따라 판단)"}
 
-**데이터 정보:** {data_info if data_info else "사용자가 제공한 data.csv 파일"}
+**[데이터 상세 프로필]**
+{data_info if data_info else "사용자가 제공한 data.csv 파일"}
 
-다음 형식으로 응답하세요:
-
-1. **코드:**
-```{language}
-# 여기에 완전한 코드
-```
-
-2. **해석:**
-생성된 분석의 의미와 결과 해석 방법
-
-3. **주의사항:**
-실험자가 알아야 할 통계적 가정이나 제약사항
+**[지시 사항]**
+1. 위 데이터 프로필을 먼저 분석하여 컬럼의 성격과 결측치 상태를 파악하세요.
+2. 요청에 가장 적합한 EDA 및 통계 분석 코드를 작성하세요.
+3. 시각화는 산점도, 박스플롯 등 데이터 관계를 가장 잘 보여주는 형식을 선택하세요.
+4. 모든 코드는 실행 가능해야 하며, 데이터 로드 경로는 'data.csv'로 가정하거나 data_info에 언급된 내용을 참고하세요.
+5. 반드시 JSON 형식으로만 응답하세요.
 """
         
         try:
             # JSON 모드를 명시적으로 요청하는 프롬프트 습합
             json_prompt = prompt + "\n\nIMPORTANT: Respond strictly in JSON format."
+            
+            # Direct API call - let exceptions bubble up for handling
             response = self.model.generate_content(json_prompt)
             full_text = response.text
             
@@ -135,8 +139,45 @@ JSON 외의 다른 텍스트는 절대 포함하지 마세요.
                 'raw_response': full_text
             }
             
+        except RuntimeError:
+            # Re-raise our custom errors (rate limit messages)
+            raise
         except Exception as e:
+            error_str = str(e)
+            # Check if it's a rate limit error that we didn't catch
+            if "429" in error_str or "quota" in error_str.lower() or "rate" in error_str.lower():
+                retry_seconds = self._extract_retry_delay(error_str)
+                raise RuntimeError(
+                    f"❌ API 할당량 초과\n\n"
+                    f"**오류 내용:**\n{error_str}\n\n"
+                    f"**해결 방법:**\n"
+                    f"1. 약 {retry_seconds}초 후 다시 시도하세요\n"
+                    f"2. 사이드바에서 모델을 'gemini-2.0-flash'로 변경해보세요\n"
+                    f"3. 할당량 확인: https://ai.dev/usage?tab=rate-limit\n"
+                    f"4. Free tier는 하루 20회 제한이 있습니다"
+                )
             raise RuntimeError(f"Gemini API 호출 및 데이터 처리 실패: {str(e)}")
+    
+    def _extract_retry_delay(self, error_str: str) -> int:
+        """Extract retry delay in seconds from error message"""
+        import re
+        # Look for patterns like "retry in 19.942340119s" or "retry_delay { seconds: 19 }"
+        patterns = [
+            r"retry in ([\d.]+)s",
+            r"retry_delay.*?seconds[:\s]+(\d+)",
+            r"Please retry in ([\d.]+)s",
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, error_str, re.IGNORECASE)
+            if match:
+                try:
+                    return int(float(match.group(1))) + 1  # Add 1 second buffer
+                except:
+                    pass
+        
+        # Default retry delay if not found
+        return 20
 
     def _detox_code(self, code: str, language: str) -> str:
         """뭉친 코드 분해 및 텍스트 자동 주석 처리 (v4.3)"""
@@ -220,13 +261,12 @@ JSON 외의 다른 텍스트는 절대 포함하지 마세요.
         self,
         user_input: str,
         previous_code: list,
-        language: str = "python"
+        language: str = "python",
+        data_info: Optional[str] = None,
+        target_variable: Optional[str] = None
     ) -> dict:
         """
         이전 분석을 고려한 연속 코드 생성
-        
-        Args:
-            previous_code: [{'code': '...', 'caption': '...'}, ...]
         """
         
         context = "\n\n".join([
@@ -244,4 +284,9 @@ JSON 외의 다른 텍스트는 절대 포함하지 마세요.
 위 분석을 기반으로 다음 단계를 진행하세요.
 """
         
-        return self.generate_analysis_code(enhanced_prompt, language)
+        return self.generate_analysis_code(
+            enhanced_prompt, 
+            language=language, 
+            data_info=data_info, 
+            target_variable=target_variable
+        )

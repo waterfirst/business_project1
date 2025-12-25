@@ -4,6 +4,7 @@ import pandas as pd
 from agents.code_generator import BioCodeGenerator
 from agents.validator import ExperimentValidator
 from utils.quarto_renderer import QuartoRenderer
+from utils.data_profiler import get_data_profile
 import tempfile
 from pathlib import Path
 from datetime import datetime
@@ -66,8 +67,24 @@ with st.sidebar:
     model_choice = st.selectbox(
         "Gemini 모델",
         ["gemini-2.5-flash (추천)", "gemini-2.0-flash"],
-        help="2.5 Flash: 비전 및 일반 작업 최적화 / 2.0 Flash: 최신 모델 (할당량 주의)"
+        help="2.5 Flash: 비전 및 일반 작업 최적화 / 2.0 Flash: 최신 모델 (할당량 주의)",
+        key="model_selector"
     )
+    
+    # Extract model name from selection
+    selected_model = "gemini-2.5-flash" if "2.5" in model_choice else "gemini-2.0-flash"
+    
+    # Reinitialize generator if model changed
+    if 'current_model' not in st.session_state:
+        st.session_state.current_model = selected_model
+    
+    if st.session_state.get('current_model') != selected_model:
+        try:
+            st.session_state.generator = BioCodeGenerator(model_name=selected_model)
+            st.session_state.current_model = selected_model
+            st.success(f"✅ 모델이 {selected_model}로 변경되었습니다")
+        except Exception as e:
+            st.error(f"모델 변경 실패: {str(e)}")
     
     language = st.selectbox("분석 언어", ["Python", "R"])
     
@@ -157,7 +174,21 @@ with tab2:
         st.warning("먼저 '데이터 입력' 탭에서 CSV 파일을 업로드해주세요.")
     else:
         df = st.session_state.uploaded_data
-        data_info = f"컬럼: {', '.join(df.columns.tolist())}"
+        
+        with st.sidebar:
+            st.divider()
+            st.subheader("🎯 분석 설정")
+            target_var = st.selectbox(
+                "종속 변수 (Target)",
+                ["결정하지 않음"] + df.columns.tolist(),
+                help="분석의 핵심이 되는 변수를 선택하세요. EDA 및 상관 분석에 활용됩니다."
+            )
+            target_variable = None if target_var == "결정하지 않음" else target_var
+            
+        data_info = get_data_profile(df)
+        
+        with st.expander("📝 데이터 프로필 요약 (AI에 전달됨)", expanded=False):
+            st.markdown(data_info)
         
         with st.expander("💡 프롬프트 예시 보기"):
             st.markdown("""
@@ -190,13 +221,16 @@ with tab2:
                             result = st.session_state.generator.generate_with_context(
                                 user_input=user_request,
                                 previous_code=st.session_state.code_history,
-                                language=language.lower()
+                                language=language.lower(),
+                                data_info=data_info,
+                                target_variable=target_variable
                             )
                         else:
                             result = st.session_state.generator.generate_analysis_code(
                                 user_input=user_request,
                                 language=language.lower(),
-                                data_info=data_info
+                                data_info=data_info,
+                                target_variable=target_variable
                             )
                         
                         st.success("✅ 코드 생성 완료!")
@@ -223,7 +257,27 @@ with tab2:
                         st.success(f"✅ 리포트 생성 탭으로 이동하세요! (총 {len(st.session_state.code_history)}개 분석)")
                         
                     except Exception as e:
-                        st.error(f"코드 생성 실패: {str(e)}")
+                        error_msg = str(e)
+                        
+                        # Check if it's a rate limit error
+                        if "할당량" in error_msg or "429" in error_msg or "quota" in error_msg:
+                            st.error("⚠️ API 할당량 초과")
+                            st.warning(error_msg)
+                            
+                            # Show helpful suggestions
+                            with st.expander("💡 해결 방법", expanded=True):
+                                st.markdown("""
+                                **즉시 해결:**
+                                1. 사이드바에서 모델을 **'gemini-2.0-flash'**로 변경 후 다시 시도
+                                2. 몇 분 후 다시 시도 (Free tier는 하루 20회 제한)
+                                
+                                **장기 해결:**
+                                - [할당량 확인](https://ai.dev/usage?tab=rate-limit)
+                                - [유료 플랜 업그레이드](https://ai.google.dev/pricing)
+                                - 여러 API 키를 번갈아 사용
+                                """)
+                        else:
+                            st.error(f"코드 생성 실패: {error_msg}")
 
 # TAB 3: 리포트 생성
 with tab3:
@@ -251,30 +305,84 @@ with tab3:
         if st.button("📄 최종 리포트 생성", type="primary", use_container_width=True):
             with st.spinner("📝 Quarto 문서 렌더링 중..."):
                 try:
+                    # Prepare data file path if data is uploaded
+                    data_file_path = None
+                    if st.session_state.uploaded_data is not None:
+                        # Save uploaded data to temp file
+                        import tempfile
+                        temp_data = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8')
+                        st.session_state.uploaded_data.to_csv(temp_data.name, index=False, encoding='utf-8')
+                        data_file_path = temp_data.name
+                        temp_data.close()
+                    
+                    # Step 1: Create QMD file
                     qmd_path = st.session_state.renderer.create_qmd_document(
                         title=exp_title,
                         author=exp_author,
                         experiment_date=str(exp_date),
                         code_chunks=st.session_state.code_history,
                         theme=theme,
-                        code_fold=not include_code
+                        code_fold=not include_code,
+                        data_file_path=data_file_path
                     )
                     
-                    if "HTML" in output_format:
-                        html_path = st.session_state.renderer.render_to_html(qmd_path)
-                        
-                        with open(html_path, 'r', encoding='utf-8') as f:
-                            html_content = f.read()
-                        
+                    st.success(f"✅ QMD 파일 생성 완료: `{qmd_path.name}`")
+                    
+                    # Show QMD file download option
+                    with open(qmd_path, 'r', encoding='utf-8') as f:
+                        qmd_content = f.read()
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
                         st.download_button(
-                            label="📥 HTML 리포트 다운로드",
-                            data=html_content,
-                            file_name=f"{exp_title}_{exp_date}.html",
-                            mime="text/html",
+                            label="📄 QMD 파일 다운로드 (디버깅용)",
+                            data=qmd_content,
+                            file_name=f"{exp_title}_{exp_date}.qmd",
+                            mime="text/plain",
                             use_container_width=True
                         )
                     
-                    st.success("🎉 리포트 생성 완료!")
+                    # Step 2: Render to HTML and/or PDF
+                    if "HTML" in output_format:
+                        with st.spinner("🔄 Quarto로 HTML 렌더링 중..."):
+                            try:
+                                html_path = st.session_state.renderer.render_to_html(qmd_path)
+                                with open(html_path, 'r', encoding='utf-8') as f:
+                                    html_content = f.read()
+                                
+                                st.download_button(
+                                    label="📥 HTML 리포트 다운로드",
+                                    data=html_content,
+                                    file_name=f"{exp_title}_{exp_date}.html",
+                                    mime="text/html",
+                                    key="dl_html",
+                                    use_container_width=True
+                                )
+                                st.success("🎉 HTML 리포트 생성 완료!")
+                            except Exception as render_error:
+                                st.error(f"❌ HTML 렌더링 실패: {str(render_error)}")
+
+                    if "PDF" in output_format:
+                        with st.spinner("🔄 Quarto로 PDF 렌더링 중..."):
+                            try:
+                                pdf_path = st.session_state.renderer.render_to_pdf(qmd_path)
+                                with open(pdf_path, 'rb') as f:
+                                    pdf_content = f.read()
+                                
+                                st.download_button(
+                                    label="📥 PDF 리포트 다운로드",
+                                    data=pdf_content,
+                                    file_name=f"{exp_title}_{exp_date}.pdf",
+                                    mime="application/pdf",
+                                    key="dl_pdf",
+                                    use_container_width=True
+                                )
+                                st.success("🎉 PDF 리포트 생성 완료!")
+                            except Exception as pdf_error:
+                                st.error(f"❌ PDF 렌더링 실패: {str(pdf_error)}")
+                                st.info("💡 PDF 생성에는 LaTeX(TinyTeX 등) 설치가 필요합니다. 'quarto install tinytex' 명령어를 실행해보세요.")
+                    else:
+                        st.info("💡 QMD 파일을 다운로드하여 수동으로 렌더링할 수 있습니다.")
                     
                 except Exception as e:
                     st.error(f"오류 발생: {str(e)}")
