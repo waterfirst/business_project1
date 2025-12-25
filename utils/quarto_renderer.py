@@ -69,7 +69,10 @@ h2 {
   margin-bottom: 2rem;
 }
 """
-        
+        # Write CSS to a file to avoid YAML indentation issues
+        css_path = self.temp_dir / "custom_style.css"
+        css_path.write_text(custom_css, encoding='utf-8')
+
         yaml_header = f"""---
 title: "{title}"
 subtitle: "AI-Powered Bio-Data Analysis Insights"
@@ -82,6 +85,7 @@ format:
     theme:
       light: flatly
       dark: darkly
+    css: custom_style.css
     code-fold: {"true" if code_fold else "false"}
     code-tools: true
     code-copy: true
@@ -95,11 +99,6 @@ format:
     df-print: paged
     embed-resources: true
     html-math-method: katex
-    include-in-header:
-      text: |
-        <style>
-{textwrap.indent(custom_css.strip(), '        ')}
-        </style>
   pdf:
     documentclass: article
     geometry: 
@@ -199,6 +198,15 @@ execute:
         
         return output_path
     
+    def _decode_output(self, output_bytes: bytes) -> str:
+        """한글 윈도우(CP949)와 UTF-8 모두 대응하는 디코딩"""
+        for encoding in ['utf-8', 'cp949', 'euc-kr']:
+            try:
+                return output_bytes.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return output_bytes.decode('utf-8', errors='replace')
+
     def render_to_html(self, qmd_path: Path) -> Path:
         """Quarto 문서를 HTML로 렌더링"""
         
@@ -206,12 +214,9 @@ execute:
             result = subprocess.run(
                 ['quarto', 'render', str(qmd_path), '--to', 'html'],
                 capture_output=True,
-                text=True,
                 check=True,
                 timeout=60,
-                cwd=str(qmd_path.parent),
-                encoding='utf-8',
-                errors='replace'
+                cwd=str(qmd_path.parent)
             )
             
             html_path = qmd_path.with_suffix('.html')
@@ -225,10 +230,13 @@ execute:
             raise RuntimeError("렌더링 시간 초과 (60초)")
         except subprocess.CalledProcessError as e:
             error_msg = f"Quarto 렌더링 실패 (exit code {e.returncode}):\n"
-            if e.stdout:
-                error_msg += f"--- STDOUT ---\n{e.stdout}\n"
-            if e.stderr:
-                error_msg += f"--- STDERR ---\n{e.stderr}\n"
+            stdout_text = self._decode_output(e.stdout) if e.stdout else ""
+            stderr_text = self._decode_output(e.stderr) if e.stderr else ""
+            
+            if stdout_text:
+                error_msg += f"--- STDOUT ---\n{stdout_text}\n"
+            if stderr_text:
+                error_msg += f"--- STDERR ---\n{stderr_text}\n"
             raise RuntimeError(error_msg)
         except FileNotFoundError:
             raise RuntimeError("Quarto가 설치되어 있지 않습니다. https://quarto.org 에서 설치하세요.")
@@ -240,12 +248,9 @@ execute:
             result = subprocess.run(
                 ['quarto', 'render', str(qmd_path), '--to', 'pdf'],
                 capture_output=True,
-                text=True,
                 check=True,
                 timeout=120,
-                cwd=str(qmd_path.parent),
-                encoding='utf-8',
-                errors='replace'
+                cwd=str(qmd_path.parent)
             )
             
             pdf_path = qmd_path.with_suffix('.pdf')
@@ -256,15 +261,18 @@ execute:
             return pdf_path
             
         except subprocess.CalledProcessError as e:
-            if "pdflatex" in e.stderr or "xelatex" in e.stderr:
+            if e.stderr and (b"pdflatex" in e.stderr or b"xelatex" in e.stderr):
                 raise RuntimeError(
                     "PDF 생성에 필요한 LaTeX가 설치되어 있지 않습니다.\n"
                     "TinyTeX 설치: quarto install tinytex"
                 )
             else:
                 error_msg = f"PDF 렌더링 실패 (exit code {e.returncode}):\n"
-                if e.stdout:
-                    error_msg += f"--- STDOUT ---\n{e.stdout}\n"
-                if e.stderr:
-                    error_msg += f"--- STDERR ---\n{e.stderr}\n"
+                stdout_text = self._decode_output(e.stdout) if e.stdout else ""
+                stderr_text = self._decode_output(e.stderr) if e.stderr else ""
+                
+                if stdout_text:
+                    error_msg += f"--- STDOUT ---\n{stdout_text}\n"
+                if stderr_text:
+                    error_msg += f"--- STDERR ---\n{stderr_text}\n"
                 raise RuntimeError(error_msg)
