@@ -132,7 +132,9 @@ execute:
                 text=True,
                 check=True,
                 timeout=60,
-                cwd=str(qmd_path.parent)
+                cwd=str(qmd_path.parent),
+                encoding='utf-8',
+                errors='replace'
             )
             
             html_path = qmd_path.with_suffix('.html')
@@ -164,7 +166,9 @@ execute:
                 text=True,
                 check=True,
                 timeout=120,
-                cwd=str(qmd_path.parent)
+                cwd=str(qmd_path.parent),
+                encoding='utf-8',
+                errors='replace'
             )
             
             pdf_path = qmd_path.with_suffix('.pdf')
