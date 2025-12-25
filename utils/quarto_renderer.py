@@ -22,64 +22,115 @@ class QuartoRenderer:
         code_fold: bool = True,
         output_path: Optional[str] = None
     ) -> Path:
-        """Quarto 문서 생성 (v4.0 - 통합 마스터 템플릿 적용)"""
+        """Quarto 문서 생성 (v3.0 - 들여쓰기 완벽 제거 버전)"""
         
-        # Determine engine
+        # Determine processing engine based on language
         is_r = any(chunk.get('language', '').lower() == 'r' for chunk in code_chunks)
         engine_section = "engine: knitr" if is_r else "jupyter: python3"
         
-        # Python path for reticulate
-        python_executable = "C:/Users/nakch/AppData/Local/Programs/Python/Python313/python.exe"
+        # Professional CSS for the report
+        custom_css = textwrap.dedent("""
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono&display=swap');
 
-        # Assemble Master Template
+            body {
+              font-family: 'Inter', system-ui, -apple-system, sans-serif;
+              line-height: 1.6;
+              color: #2c3e50;
+            }
+
+            .quarto-title-block .quarto-title-banner {
+              background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+              padding: 4rem 0;
+              color: white;
+              margin-bottom: 2rem;
+              border-radius: 0 0 20px 20px;
+            }
+
+            .abstract-box {
+              background: #f8f9fa;
+              padding: 2rem;
+              border-radius: 15px;
+              border-left: 8px solid #3498db;
+              margin-bottom: 3rem;
+              box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            }
+
+            h2 {
+              color: #1a2a6c;
+              border-bottom: 3px solid #fdbb2d;
+              padding-bottom: 0.5rem;
+              margin-top: 3rem;
+              font-weight: 600;
+            }
+
+            .callout {
+              border-radius: 15px !important;
+              border: none !important;
+              box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            }
+        """).strip()
+        
+        # Write CSS to a file
+        css_path = self.temp_dir / "custom_style.css"
+        css_path.write_text(custom_css, encoding='utf-8-sig')
+
+        # Assemble document line by line to guarantee zero indentation
         lines = []
+        
+        # YAML Header
         lines.append("---")
         lines.append(f'title: "{title}"')
-        lines.append('subtitle: "AI-Powered Scientific Data Analysis & Visualization"')
+        lines.append('subtitle: "AI-Powered Bio-Data Analysis Executive Report"')
         lines.append(f'author: "{author}"')
-        lines.append(f"date: {experiment_date}")
+        lines.append(f'date: "{experiment_date}"')
         lines.append("lang: ko")
         lines.append(engine_section)
         lines.append("format:")
         lines.append("  html:")
-        lines.append(f"    theme: {theme}")
-        lines.append("    toc: true")
+        lines.append("    theme: flatly")
+        lines.append("    css: custom_style.css")
+        lines.append("    title-block-banner: true")
         lines.append("    code-fold: true")
-        lines.append('    code-summary: "분석 코드 확인"')
-        lines.append("    code-tools: true")
-        lines.append("    df-print: paged")
+        lines.append('    code-summary: "분석 소스 코드 보기"')
+        lines.append("    toc: true")
+        lines.append("    toc-location: left")
+        lines.append("    number-sections: true")
         lines.append("    embed-resources: true")
         lines.append("    html-math-method: katex")
-        lines.append("  pdf:")
-        lines.append("    toc: true")
-        lines.append("    number-sections: true")
-        lines.append("    colorlinks: true")
-        lines.append("    df-print: kable")
-        lines.append('    mainfont: "NanumGothic"') # Or "Malgun Gothic"
-        lines.append("    header-includes: |")
-        lines.append("      \\usepackage{chemfig}")
         lines.append("execute:")
         lines.append("  warning: false")
         lines.append("  message: false")
         lines.append("  echo: false")
         lines.append("---")
         lines.append("")
+        lines.append("")
         
-        # R-Python Interoperability Setup if R is used
-        if is_r:
-            lines.append("```{r}")
-            lines.append("#| label: setup-interop")
-            lines.append("#| include: false")
-            lines.append("library(reticulate)")
-            lines.append(f'try(use_python("{python_executable}"), silent = TRUE)')
-            lines.append("```")
-            lines.append("")
+        # Abstract Section
+        lines.append(f"## 실험 요약 및 컨텍스트 {{.unnumbered}}")
+        lines.append("")
+        lines.append("::: {.abstract-box}")
+        lines.append("")
+        lines.append("::: {.grid}")
+        lines.append("")
+        lines.append("::: {.g-col-6}")
+        lines.append(f"- **실험 프로젝트**: {title}")
+        lines.append(f"- **수석 연구원**: {author}")
+        lines.append(f"- **분석 일시**: {experiment_date}")
+        lines.append(":::")
+        lines.append("")
+        lines.append("::: {.g-col-6}")
+        lines.append("- **시스템 버전**: Bio-Log v3.0 Professional")
+        lines.append("- **AI 엔진**: Google Gemini 2.5 Flash")
+        lines.append(f"- **분석 항목**: 총 {len(code_chunks)}개의 핵심 모듈")
+        lines.append(":::")
+        lines.append("")
+        lines.append(":::") # End Grid
+        lines.append("")
+        lines.append(":::") # End Abstract Box
+        lines.append("")
+        lines.append("---")
+        lines.append("")
 
-        lines.append("# 분석 개요")
-        lines.append("")
-        lines.append(f"본 문서는 **{author}** 연구원이 수행한 **{title}** 실험의 지능형 분석 결과입니다.")
-        lines.append("")
-        
         # Content Blocks
         for i, chunk in enumerate(code_chunks, 1):
             lang = chunk.get('language', 'python')
@@ -87,22 +138,27 @@ class QuartoRenderer:
             caption = chunk.get('caption', f'Analysis {i}')
             interpretation = chunk.get('interpretation', '')
             
-            lines.append(f"# {i}. {caption}")
+            # Ensure code blocks start at Col 0
+            lines.append(f"## 분석 {i}: {caption}")
             lines.append("")
             
+            # Code Block with double padding and echo: false (to show only results)
             lines.append(f"```{{{lang}}}")
-            lines.append(f"#| label: analysis-{i}")
+            lines.append(f"#| label: fig-analysis-{i}")
             lines.append(f'#| fig-cap: "{caption}"')
             lines.append("#| echo: false")
             lines.append("")
+            lines.append("") # Extra space before code
             lines.append(code)
             lines.append("")
             lines.append("```")
             lines.append("")
+            lines.append("")
             
+            # Interpretation
             if interpretation:
-                lines.append("::: {.callout-note}")
-                lines.append(f"## 💡 {caption} 결과 해석")
+                lines.append('::: {.callout-note appearance="simple"}')
+                lines.append("### 💡 결과 해석 및 임상적 의미")
                 lines.append("")
                 lines.append(interpretation)
                 lines.append(":::")
@@ -112,13 +168,16 @@ class QuartoRenderer:
             lines.append("")
 
         # Footer
-        lines.append("# 결론")
+        lines.append(f"## 결론 및 향후 제언 {{.unnumbered}}")
         lines.append("")
-        lines.append("실험 데이터와 AI 기반 분석을 종합한 결과입니다. 통계적 유의성은 실험 조건에 따라 재검토가 필요합니다.")
+        lines.append("본 리포트는 Google Gemini AI에 의해 자동 생성된 전문 분석 결과입니다.")
+        lines.append("모든 통계 수치는 데이터의 품질과 실험 설계에 의존하므로 전문가의 최종 교차 검증을 권장합니다.")
         lines.append("")
         lines.append("---")
-        lines.append(f"*Generated by Bio-Log Professional v4.2 - Ultimate Stability Edition*")
+        lines.append("")
+        lines.append("*Generated by Bio-Log Professional v3.0 - The Next Generation Lab Notebook*")
 
+        # Final string assembly
         content = "\n".join(lines)
         
         if output_path is None:
@@ -127,7 +186,7 @@ class QuartoRenderer:
             output_path = Path(output_path)
         
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        # Force standard UTF-8 for broadest compatibility across R/Python kernels
+        # Use standard utf-8 for broadest compatibility
         output_path.write_text(content, encoding='utf-8')
         
         return output_path
@@ -144,9 +203,8 @@ class QuartoRenderer:
     def render_to_html(self, qmd_path: Path) -> Path:
         """Quarto 문서를 HTML로 렌더링"""
         
-        # Enforce UTF-8 for subprocess (Crucial for Windows)
+        # Enforce UTF-8 for subprocess
         env = os.environ.copy()
-        env['PYTHONUTF8'] = '1'
         env['PYTHONIOENCODING'] = 'utf-8'
         env['LANG'] = 'ko_KR.UTF-8'
         
@@ -155,7 +213,7 @@ class QuartoRenderer:
                 ['quarto', 'render', str(qmd_path), '--to', 'html'],
                 capture_output=True,
                 check=True,
-                timeout=120, # Increased timeout for complex renders
+                timeout=60,
                 cwd=str(qmd_path.parent),
                 env=env
             )
@@ -185,19 +243,13 @@ class QuartoRenderer:
     def render_to_pdf(self, qmd_path: Path) -> Path:
         """Quarto 문서를 PDF로 렌더링"""
         
-        # Enforce UTF-8 for subprocess
-        env = os.environ.copy()
-        env['PYTHONUTF8'] = '1'
-        env['PYTHONIOENCODING'] = 'utf-8'
-        
         try:
             result = subprocess.run(
                 ['quarto', 'render', str(qmd_path), '--to', 'pdf'],
                 capture_output=True,
                 check=True,
-                timeout=180, # PDF rendering takes longer
-                cwd=str(qmd_path.parent),
-                env=env
+                timeout=120,
+                cwd=str(qmd_path.parent)
             )
             
             pdf_path = qmd_path.with_suffix('.pdf')
