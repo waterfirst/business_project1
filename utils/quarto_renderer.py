@@ -1,4 +1,5 @@
 # utils/quarto_renderer.py
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -99,8 +100,9 @@ class QuartoRenderer:
         lines.append("execute:")
         lines.append("  warning: false")
         lines.append("  message: false")
-        lines.append("  echo: true")
+        lines.append("  echo: false")
         lines.append("---")
+        lines.append("")
         lines.append("")
         
         # Abstract Section
@@ -136,16 +138,21 @@ class QuartoRenderer:
             caption = chunk.get('caption', f'Analysis {i}')
             interpretation = chunk.get('interpretation', '')
             
+            # Ensure code blocks start at Col 0
             lines.append(f"## 분석 {i}: {caption}")
             lines.append("")
             
-            # Code Block
+            # Code Block with double padding and echo: false (to show only results)
             lines.append(f"```{{{lang}}}")
             lines.append(f"#| label: fig-analysis-{i}")
             lines.append(f'#| fig-cap: "{caption}"')
+            lines.append("#| echo: false")
             lines.append("")
+            lines.append("") # Extra space before code
             lines.append(code)
+            lines.append("")
             lines.append("```")
+            lines.append("")
             lines.append("")
             
             # Interpretation
@@ -179,7 +186,8 @@ class QuartoRenderer:
             output_path = Path(output_path)
         
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(content, encoding='utf-8-sig')
+        # Use standard utf-8 for broadest compatibility
+        output_path.write_text(content, encoding='utf-8')
         
         return output_path
     
@@ -195,13 +203,19 @@ class QuartoRenderer:
     def render_to_html(self, qmd_path: Path) -> Path:
         """Quarto 문서를 HTML로 렌더링"""
         
+        # Enforce UTF-8 for subprocess
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['LANG'] = 'ko_KR.UTF-8'
+        
         try:
             result = subprocess.run(
                 ['quarto', 'render', str(qmd_path), '--to', 'html'],
                 capture_output=True,
                 check=True,
                 timeout=60,
-                cwd=str(qmd_path.parent)
+                cwd=str(qmd_path.parent),
+                env=env
             )
             
             html_path = qmd_path.with_suffix('.html')

@@ -108,24 +108,22 @@ class BioCodeGenerator:
             response = self.model.generate_content(prompt)
             full_text = response.text
             
-            # 코드 블록 추출 (v3.0 - 가장 견고한 추출 로직)
-            # 1. ```언어 ... ``` 패턴 시도
+            # 코드 블록 추출 (v3.1 - 개행 처리 강화)
             code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
             code_match = re.search(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
             
             if code_match:
                 code = code_match.group(1).strip()
             else:
-                # 2. 백틱이 하나만 있거나 아예 없는 경우 텍스트 클리닝
                 code = full_text.strip()
             
-            # [중요] 코드 내부의 중복된 백틱이나 랭귀지 마커를 완전히 제거하여 SyntaxError 원천 차단
-            # QuartoRenderer가 다시 감싸기 때문에 여기서는 순수 코드만 남겨야 함
+            # [중요] 중복된 백틱이나 랭귀지 마커 제거
             code = re.sub(rf"```(?:{language}|[a-zA-Z]+)?", "", code)
             code = code.replace("```", "").strip()
             
-            # 행 시작부분의 공백 제거 (Quarto 렌더링 안정성)
-            code = "\n".join([line.lstrip() for line in code.split("\n")])
+            # [결정적 해결] 플랫폼 독립적 개행 처리 (Windows/Linux 혼용 대응)
+            # 모든 유형의 개행(\n, \r\n, \r)을 표준 \n으로 통합
+            code = "\n".join(code.splitlines())
             
             # 해석 부분 추출
             interpretation_pattern = r"\*\*해석:\*\*(.*?)(?:\*\*주의사항:\*\*|$)"
