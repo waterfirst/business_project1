@@ -40,22 +40,23 @@ class BioCodeGenerator:
 사용자의 자연어 설명을 **실행 가능한** R 또는 Python 코드로 변환합니다.
 
 **핵심 규칙:**
-1. 코드는 Quarto 문서(.qmd)에서 실행되므로 청크 형식 준수
+1. 코드는 Quarto 문서(.qmd)에서 실행되므로 반드시 유효한 구문만 포함
 2. 통계 검정 시 반드시 가정 검증 단계 포함 (정규성, 등분산성)
-3. 시각화는 publication-quality로:
-   - Python: plotly 또는 seaborn
-   - R: ggplot2 + theme_bw()
-4. 주석은 한글로 상세히 작성
+3. 시각화는 publication-quality로 (가독성 높은 폰트와 레이블)
+4. 모든 코드는 반드시 주석(#)을 포함하여 줄바꿈을 지키며 작성
 5. 데이터 파일명은 'data.csv'로 가정
-6. 결과 해석 텍스트도 함께 제공
+6. 다른 설명 텍스트는 절대 코드 블록 안에 넣지 말 것
 
 **응답 형식:**
+반드시 아래 형식의 마크다운 블록으로 응답하세요:
+
+1. **코드:**
 ```{언어}
-# 코드 내용
+# 여기에 순수 코드만 작성 (설명 텍스트 포함 금지)
 ```
 
-**해석:**
-통계 결과에 대한 간단한 설명
+2. **해석:**
+결과 분석 요약
 """
     
     def generate_analysis_code(
@@ -108,32 +109,55 @@ class BioCodeGenerator:
             response = self.model.generate_content(prompt)
             full_text = response.text
             
-            # 코드 블록 추출 (v3.1 - 개행 처리 강화)
+            # [단계 1] 백틱 블록 추출 (가장 우선)
             code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
-            code_match = re.search(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
+            code_matches = re.findall(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
             
-            if code_match:
-                code = code_match.group(1).strip()
+            if code_matches:
+                # 가장 긴 블록을 코드로 선택 (가장 완전할 가능성이 높음)
+                code = max(code_matches, key=len).strip()
             else:
-                code = full_text.strip()
+                # [단계 2] 백틱이 없는 경우 "코드:" 섹션 이후부터 "해석:" 이전까지 추출
+                sect_pattern = r"\*\*코드:\*\*(.*?)(?:\*\*해석:\*\*|$)"
+                sect_match = re.search(sect_pattern, full_text, re.DOTALL | re.IGNORECASE)
+                if sect_match:
+                    code = sect_match.group(1).strip()
+                else:
+                    # [단계 3] 최후의 수단: 전체 텍스트
+                    code = full_text.strip()
             
-            # [중요] 중복된 백틱이나 랭귀지 마커 제거
-            code = re.sub(rf"```(?:{language}|[a-zA-Z]+)?", "", code)
+            # [단계 4] 코드 정제 (남은 마커 제거 및 개행 복구)
+            # 모든 유형의 백틱/언어 마커 제거
+            code = re.sub(r"```[a-zA-Z]*", "", code)
             code = code.replace("```", "").strip()
             
-            # [결정적 해결] 플랫폼 독립적 개행 처리 (Windows/Linux 혼용 대응)
-            # 모든 유형의 개행(\n, \r\n, \r)을 표준 \n으로 통합
-            code = "\n".join(code.splitlines())
+            # [결정적 해결] 플랫폼 독립적 개행 및 공백 처리
+            # 1. 모든 개행문자를 \n으로 통합
+            # 2. mashed lines 방지를 위해 각 라인을 개별 처리
+            clean_lines = []
+            for line in code.splitlines():
+                l = line.strip()
+                if l:
+                    # "1. 라이브러리 임포트" 같은 텍스트가 코드 줄에 섞여 있는 경우 주석 처리 감지
+                    # 만약 줄이 숫자로 시작하고 코드가 아닌 것 같으면 주석 처리
+                    if re.match(r"^\d+\.", l) and not ("import " in l or "=" in l or "(" in l):
+                        l = f"# {l}"
+                    clean_lines.append(l)
+                else:
+                    clean_lines.append("")
             
-            # 해석 부분 추출
-            interpretation_pattern = r"\*\*해석:\*\*(.*?)(?:\*\*주의사항:\*\*|$)"
-            interp_match = re.search(interpretation_pattern, full_text, re.DOTALL)
-            interpretation = interp_match.group(1).strip() if interp_match else ""
+            code = "\n".join(clean_lines)
             
-            # 주의사항 추출
-            warning_pattern = r"\*\*주의사항:\*\*(.*?)$"
-            warn_match = re.search(warning_pattern, full_text, re.DOTALL)
-            warnings = warn_match.group(1).strip() if warn_match else ""
+            # [단계 5] 해석/주의사항 추출
+            interpretation = ""
+            interp_match = re.search(r"\*\*해석:\*\*(.*?)(?:\*\*주의사항:\*\*|$)", full_text, re.DOTALL | re.IGNORECASE)
+            if interp_match:
+                interpretation = interp_match.group(1).strip()
+            
+            warnings = ""
+            warn_match = re.search(r"\*\*주의사항:\*\*(.*?)$", full_text, re.DOTALL | re.IGNORECASE)
+            if warn_match:
+                warnings = warn_match.group(1).strip()
             
             return {
                 'code': code,
