@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional, List
+import textwrap
 
 class QuartoRenderer:
     """Quarto 문서 생성 및 렌더링"""
@@ -97,7 +98,7 @@ format:
     include-in-header:
       text: |
         <style>
-        {custom_css.strip()}
+{textwrap.indent(custom_css.strip(), '        ')}
         </style>
   pdf:
     documentclass: article
