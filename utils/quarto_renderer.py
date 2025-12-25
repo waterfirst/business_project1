@@ -73,74 +73,63 @@ h2 {
         css_path = self.temp_dir / "custom_style.css"
         css_path.write_text(custom_css, encoding='utf-8-sig')
 
-        yaml_header = f"""---
-title: "{title}"
-subtitle: "AI-Powered Bio-Data Analysis Insights"
-author: "{author}"
-date: "{experiment_date}"
-lang: ko
-{engine_section}
-format:
-  html:
-    theme:
-      light: flatly
-      dark: darkly
-    css: custom_style.css
-    code-fold: {"true" if code_fold else "false"}
-    code-tools: true
-    code-copy: true
-    toc: true
-    toc-depth: 3
-    toc-location: left
-    smooth-scroll: true
-    highlight-style: monokai
-    number-sections: true
-    fig-cap-location: bottom
-    df-print: paged
-    embed-resources: true
-    html-math-method: katex
-  pdf:
-    documentclass: article
-    geometry: 
-      - margin=1in
-    toc: true
-    number-sections: true
-    colorlinks: true
-    mainfont: "NanumGothic"
-execute:
-  warning: false
-  message: false
----
+        # Prepare YAML header with folding and professional theme
+        # We use dedent and no leading whitespace for markers
+        yaml_header = textwrap.dedent(f"""\
+            ---
+            title: "{title}"
+            subtitle: "AI-Powered Bio-Data Analysis Insights"
+            author: "{author}"
+            date: "{experiment_date}"
+            lang: ko
+            {engine_section}
+            format:
+              html:
+                theme: flatly
+                css: custom_style.css
+                code-fold: true
+                code-summary: "소스 코드 보기"
+                toc: true
+                toc-location: left
+                number-sections: true
+                embed-resources: true
+                html-math-method: katex
+              pdf:
+                documentclass: article
+                mainfont: "NanumGothic"
+            execute:
+              warning: false
+              message: false
+            ---
 
-"""
+            """).strip() + "\n\n"
         
-        abstract = f"""
+        abstract = textwrap.dedent(f"""\
+            ## 실험 요약 및 컨텍스트 {{.unnumbered}}
 
-## 실험 요약 및 컨텍스트 {{.unnumbered}}
+            ::: {{.abstract-box}}
 
-::: {{.abstract-box}}
+            ::: {{.grid}}
 
-::: {{.grid}}
+            ::: {{.g-col-6}}
+            - **실험 제목**: {title}
+            - **책임 연구원**: {author}
+            - **실험 일시**: {experiment_date}
+            :::
 
-::: {{.g-col-6}}
-- **실험 제목**: {title}
-- **책임 연구원**: {author}
-- **실험 일시**: {experiment_date}
-:::
+            ::: {{.g-col-6}}
+            - **분석 시스템**: Bio-Log v2.7
+            - **지능형 엔진**: Google Gemini 2.5
+            - **수행된 분석**: 총 {len(code_chunks)}개의 분석 세트
+            :::
 
-::: {{.g-col-6}}
-- **분석 시스템**: Bio-Log v2.2
-- **지능형 엔진**: Google Gemini 2.5
-- **수행된 분석**: 총 {len(code_chunks)}개의 분석 세트
-:::
+            :::
 
-:::
+            :::
 
-:::
+            ---
 
----
-
-"""
+            """).strip() + "\n\n"
         
         content = yaml_header + abstract
         
@@ -150,44 +139,42 @@ execute:
             caption = chunk.get('caption', f'분석 {i}')
             interpretation = chunk.get('interpretation', '')
             
-            content += f"""
-## 분석 {i}: {caption}
-
-"""
+            # Ensure code blocks start at Col 0
+            content += f"## 분석 {i}: {caption}\n\n"
             
-            content += f"""
-```{lang}
-#| label: fig-analysis-{i}
-#| fig-cap: "{caption}"
+            content += textwrap.dedent(f"""\
+                ```{{{lang}}}
+                #| label: fig-analysis-{i}
+                #| fig-cap: "{caption}"
 
-{code}
-```
+                {code}
+                ```
 
-"""
+                """).strip() + "\n\n"
             
             if interpretation:
-                content += f"""
-::: {{.callout-note appearance="simple"}}
-### 💡 결과 해석
+                content += textwrap.dedent(f"""\
+                    ::: {{.callout-note appearance="simple"}}
+                    ### 💡 결과 해석
 
-{interpretation}
-:::
+                    {interpretation}
+                    :::
 
-"""
+                    """).strip() + "\n\n"
             
-            content += "\n---\n\n"
+            content += "---\n\n"
         
-        content += f"""
-## 결론 및 제언 {{.unnumbered}}
+        content += textwrap.dedent(f"""\
+            ## 결론 및 제언 {{.unnumbered}}
 
-본 분석은 Google Gemini AI를 활용하여 자동 생성되었습니다. 
-통계적 결과는 실험 설계와 데이터 품질에 따라 달라질 수 있으므로, 
-항상 도메인 전문가의 검토가 필요합니다.
+            본 분석은 Google Gemini AI를 활용하여 자동 생성되었습니다. 
+            통계적 결과는 실험 설계와 데이터 품질에 따라 달라질 수 있으므로, 
+            항상 도메인 전문가의 검토가 필요합니다.
 
----
+            ---
 
-*Generated by Bio-Log - AI-Powered Lab Notebook*
-"""
+            *Generated by Bio-Log - AI-Powered Lab Notebook (v2.7)*
+            """).strip()
         
         if output_path is None:
             output_path = self.temp_dir / "report.qmd"
