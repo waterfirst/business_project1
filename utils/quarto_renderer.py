@@ -24,22 +24,28 @@ class QuartoRenderer:
         
         yaml_header = f"""---
 title: "{title}"
-subtitle: "Google Gemini를 활용한 자동 분석 리포트"
+subtitle: "AI-Powered Bio-Data Analysis Insights"
 author: "{author}"
 date: "{experiment_date}"
+lang: ko
 format:
   html:
+    theme:
+      light: [flatly, custom.scss]
+      dark: darkly
     code-fold: {"true" if code_fold else "false"}
     code-tools: true
     code-copy: true
     toc: true
     toc-depth: 3
     toc-location: left
-    theme: {theme}
     smooth-scroll: true
-    highlight-style: github
+    highlight-style: monokai
     number-sections: true
     fig-cap-location: bottom
+    margin-left: 20px
+    margin-right: 20px
+    embed-resources: true
   pdf:
     documentclass: article
     geometry: 
@@ -47,22 +53,67 @@ format:
     toc: true
     number-sections: true
     colorlinks: true
+    mainfont: "NanumGothic"
 jupyter: python3
 execute:
   warning: false
   message: false
 ---
 
+```{css, echo=FALSE}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono&display=swap');
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+.quarto-title-block .quarto-title-banner {
+  background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+  padding-top: 3em;
+  padding-bottom: 2em;
+  color: white;
+}
+
+.quarto-title-meta {
+  border-top: 1px solid #eee;
+  padding-top: 1em;
+}
+
+h2 {
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 0.3em;
+  margin-top: 1.5em;
+  font-weight: 600;
+}
+
+.callout {
+  border-radius: 8px;
+  border-left-width: 5px;
+}
+```
+
 """
         
         abstract = f"""
-## 실험 개요 {{.unnumbered}}
 
+## 실험 개요 {.unnumbered}
+
+::: {.grid}
+
+::: {.g-col-6}
 - **실험 제목**: {title}
 - **실험자**: {author}
 - **실험 날짜**: {experiment_date}
-- **분석 도구**: Bio-Log v2.0 (Google Gemini 2.0)
+:::
+
+::: {.g-col-6}
+- **분석 도구**: Bio-Log v2.1
+- **엔진**: Google Gemini 2.5
 - **총 분석 수**: {len(code_chunks)}개
+:::
+
+:::
 
 ---
 
@@ -92,9 +143,11 @@ execute:
             
             if interpretation:
                 content += f"""
-### 결과 해석
+::: {.callout-note appearance="simple"}
+### 💡 결과 해석
 
 {interpretation}
+:::
 
 """
             
