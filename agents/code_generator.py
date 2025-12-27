@@ -123,22 +123,22 @@ class BioCodeGenerator:
 4. 모든 코드는 실행 가능해야 하며, 데이터 로드 경로는 'data.csv'로 가정하거나 data_info에 언급된 내용을 참고하세요.
 5. 반드시 JSON 형식으로만 응답하세요.
 """
-        
+
+        # 변수 초기화 (모든 경로에서 사용 가능하도록 함수 시작 부분에 배치)
+        code = ""
+        interpretation = ""
+        warnings = ""
+
         try:
             # JSON 모드를 명시적으로 요청하는 프롬프트 습합
             json_prompt = prompt + "\n\nIMPORTANT: Respond strictly in JSON format."
-            
+
             # Direct API call - let exceptions bubble up for handling
             response = self.model.generate_content(json_prompt)
             full_text = response.text
-            
+
             # JSON 파싱
             import json
-
-            # 변수 초기화 (fallback 대비)
-            code = ""
-            interpretation = ""
-            warnings = ""
 
             try:
                 data = json.loads(full_text)
