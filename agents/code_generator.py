@@ -15,14 +15,28 @@ class BioCodeGenerator:
     def __init__(self, model_name: str = "gemini-2.5-flash"):
         """
         Args:
-            model_name: 'gemini-2.0-flash' (빠름, 추천) 또는 
+            model_name: 'gemini-2.0-flash' (빠름, 추천) 또는
                        'gemini-2.5-flash' (비전 가능)
         """
-        # API 키 설정
-        api_key = os.getenv("GOOGLE_API_KEY")
+        # API 키 설정 - Streamlit secrets 우선, 그 다음 .env
+        api_key = None
+
+        # Try Streamlit secrets first (for deployed apps)
+        try:
+            import streamlit as st
+            if hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:
+                api_key = st.secrets["GOOGLE_API_KEY"]
+        except:
+            pass
+
+        # Fallback to .env file (for local development)
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY 환경변수가 설정되지 않았습니다.")
-        
+            api_key = os.getenv("GOOGLE_API_KEY")
+
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY가 설정되지 않았습니다. "
+                           ".env 파일 또는 Streamlit secrets에 API 키를 추가하세요.")
+
         genai.configure(api_key=api_key)
         
         # 모델 초기화 (JSON 모드 지원을 위해 config 확장)

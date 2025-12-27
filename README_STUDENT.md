@@ -78,16 +78,27 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Google API 키 설정
+### 3. Google API 키 설정 ⚠️ 중요!
 
 1. [Google AI Studio](https://ai.google.dev/)에 접속
 2. "Get API Key" 클릭하여 무료 API 키 발급
 3. 프로젝트 루트에 `.env` 파일 생성:
 
 ```bash
-# .env 파일 내용
-GOOGLE_API_KEY=여기에_발급받은_API_키_입력
+# .env.example 파일을 복사하여 .env로 만들기
+# Windows:
+copy .env.example .env
+# Mac/Linux:
+cp .env.example .env
 ```
+
+4. `.env` 파일을 열어서 발급받은 API 키 입력:
+```bash
+# .env 파일 내용
+GOOGLE_API_KEY=AIzaSy...여기에_발급받은_API_키_전체_붙여넣기
+```
+
+**주의**: `.env` 파일은 절대 Git에 커밋하지 마세요! (이미 .gitignore에 포함됨)
 
 ### 4. 실행
 
