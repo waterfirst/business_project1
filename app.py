@@ -528,75 +528,76 @@ with tab3:
 
                         # Step 1: Create QMD file
                         qmd_path = st.session_state.renderer.create_qmd_document(
-                        title=exp_title,
-                        author=exp_author,
-                        experiment_date=str(exp_date),
-                        code_chunks=st.session_state.code_history,
-                        theme=theme,
-                        code_fold=not include_code,
-                        data_file_path=data_file_path
-                    )
-                    
-                    st.success(f"✅ QMD 파일 생성 완료: `{qmd_path.name}`")
-                    
-                    # Show QMD file download option
-                    with open(qmd_path, 'r', encoding='utf-8') as f:
-                        qmd_content = f.read()
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.download_button(
-                            label="📄 QMD 파일 다운로드 (디버깅용)",
-                            data=qmd_content,
-                            file_name=f"{exp_title}_{exp_date}.qmd",
-                            mime="text/plain",
-                            use_container_width=True
+                            title=exp_title,
+                            author=exp_author,
+                            experiment_date=str(exp_date),
+                            code_chunks=st.session_state.code_history,
+                            theme=theme,
+                            code_fold=not include_code,
+                            data_file_path=data_file_path
                         )
-                    
-                    # Step 2: Render to HTML and/or PDF
-                    if "HTML" in output_format:
-                        with st.spinner("🔄 Quarto로 HTML 렌더링 중..."):
-                            try:
-                                html_path = st.session_state.renderer.render_to_html(qmd_path)
-                                with open(html_path, 'r', encoding='utf-8') as f:
-                                    html_content = f.read()
-                                
-                                st.download_button(
-                                    label="📥 HTML 리포트 다운로드",
-                                    data=html_content,
-                                    file_name=f"{exp_title}_{exp_date}.html",
-                                    mime="text/html",
-                                    key="dl_html",
-                                    use_container_width=True
-                                )
-                                st.success("🎉 HTML 리포트 생성 완료!")
-                            except Exception as render_error:
-                                st.error(f"❌ HTML 렌더링 실패: {str(render_error)}")
 
-                    if "PDF" in output_format:
-                        with st.spinner("🔄 Quarto로 PDF 렌더링 중..."):
-                            try:
-                                pdf_path = st.session_state.renderer.render_to_pdf(qmd_path)
-                                with open(pdf_path, 'rb') as f:
-                                    pdf_content = f.read()
-                                
-                                st.download_button(
-                                    label="📥 PDF 리포트 다운로드",
-                                    data=pdf_content,
-                                    file_name=f"{exp_title}_{exp_date}.pdf",
-                                    mime="application/pdf",
-                                    key="dl_pdf",
-                                    use_container_width=True
-                                )
-                                st.success("🎉 PDF 리포트 생성 완료!")
-                            except Exception as pdf_error:
-                                st.error(f"❌ PDF 렌더링 실패: {str(pdf_error)}")
-                                st.info("💡 PDF 생성에는 LaTeX(TinyTeX 등) 설치가 필요합니다. 'quarto install tinytex' 명령어를 실행해보세요.")
-                    else:
-                        st.info("💡 QMD 파일을 다운로드하여 수동으로 렌더링할 수 있습니다.")
-                    
-                except Exception as e:
-                    st.error(f"오류 발생: {str(e)}")
+                        st.success(f"✅ QMD 파일 생성 완료: `{qmd_path.name}`")
+
+                        # Show QMD file download option
+                        with open(qmd_path, 'r', encoding='utf-8') as f:
+                            qmd_content = f.read()
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.download_button(
+                                label="📄 QMD 파일 다운로드 (디버깅용)",
+                                data=qmd_content,
+                                file_name=f"{exp_title}_{exp_date}.qmd",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
+
+                        # Step 2: Render to HTML and/or PDF
+                        if "HTML" in output_format:
+                            with st.spinner("🔄 Quarto로 HTML 렌더링 중..."):
+                                try:
+                                    html_path = st.session_state.renderer.render_to_html(qmd_path)
+                                    with open(html_path, 'r', encoding='utf-8') as f:
+                                        html_content = f.read()
+
+                                    st.download_button(
+                                        label="📥 HTML 리포트 다운로드",
+                                        data=html_content,
+                                        file_name=f"{exp_title}_{exp_date}.html",
+                                        mime="text/html",
+                                        key="dl_html",
+                                        use_container_width=True
+                                    )
+                                    st.success("🎉 HTML 리포트 생성 완료!")
+                                except Exception as render_error:
+                                    st.error(f"❌ HTML 렌더링 실패: {str(render_error)}")
+
+                        if "PDF" in output_format:
+                            with st.spinner("🔄 Quarto로 PDF 렌더링 중..."):
+                                try:
+                                    pdf_path = st.session_state.renderer.render_to_pdf(qmd_path)
+                                    with open(pdf_path, 'rb') as f:
+                                        pdf_content = f.read()
+
+                                    st.download_button(
+                                        label="📥 PDF 리포트 다운로드",
+                                        data=pdf_content,
+                                        file_name=f"{exp_title}_{exp_date}.pdf",
+                                        mime="application/pdf",
+                                        key="dl_pdf",
+                                        use_container_width=True
+                                    )
+                                    st.success("🎉 PDF 리포트 생성 완료!")
+                                except Exception as pdf_error:
+                                    st.error(f"❌ PDF 렌더링 실패: {str(pdf_error)}")
+                                    st.info("💡 PDF 생성에는 LaTeX(TinyTeX 등) 설치가 필요합니다. 'quarto install tinytex' 명령어를 실행해보세요.")
+
+                        if "HTML" not in output_format and "PDF" not in output_format:
+                            st.info("💡 QMD 파일을 다운로드하여 수동으로 렌더링할 수 있습니다.")
+
+                    except Exception as e:
+                        st.error(f"오류 발생: {str(e)}")
 
 # TAB 4: 예제 & 템플릿
 with tab4:
