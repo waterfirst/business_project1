@@ -392,6 +392,102 @@ fig_resid
                 
         return "\n".join(final_lines)
     
+    def fix_code_error(
+        self,
+        broken_code: str,
+        error_message: str,
+        language: str = "python",
+        data_info: Optional[str] = None
+    ) -> dict:
+        """
+        에러가 발생한 코드를 Gemini에게 수정 요청
+
+        Args:
+            broken_code: 에러가 발생한 원본 코드
+            error_message: 발생한 에러 메시지
+            language: 코드 언어
+            data_info: 데이터 정보
+
+        Returns:
+            수정된 코드와 수정 설명
+        """
+
+        fix_prompt = f"""
+**[긴급 코드 수정 요청]**
+
+아래 코드를 실행했더니 에러가 발생했습니다. 코드를 분석하고 수정해주세요.
+
+**에러가 발생한 코드:**
+```{language}
+{broken_code}
+```
+
+**에러 메시지:**
+```
+{error_message}
+```
+
+**데이터 정보:**
+{data_info if data_info else "data.csv 파일 사용"}
+
+**수정 지침:**
+1. 에러의 원인을 파악하세요 (import 오류, 구문 오류, 변수명 오류 등)
+2. 원본 코드의 의도를 최대한 유지하면서 수정하세요
+3. 필요한 import 구문을 추가하거나 수정하세요
+4. 변수명이나 컬럼명이 데이터와 일치하는지 확인하세요
+5. 수정된 코드는 즉시 실행 가능해야 합니다
+
+**응답 형식 (JSON):**
+{{
+    "code": "수정된 완전한 코드",
+    "interpretation": "어떤 문제가 있었고, 어떻게 수정했는지 설명",
+    "warnings": "주의사항이 있다면 작성"
+}}
+
+반드시 위 JSON 형식으로만 응답하세요.
+"""
+
+        try:
+            response = self.model.generate_content(fix_prompt)
+            full_text = response.text
+
+            # JSON 파싱
+            import json
+
+            try:
+                data = json.loads(full_text)
+                code_raw = data.get('code', '')
+                interpretation = data.get('interpretation', '')
+                warnings = data.get('warnings', '')
+
+                # Handle case where code might be returned as a list
+                if isinstance(code_raw, list):
+                    code = '\n'.join(str(item) for item in code_raw)
+                else:
+                    code = str(code_raw) if code_raw else ''
+
+            except json.JSONDecodeError:
+                # Fallback
+                import re
+                code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
+                code_matches = re.findall(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
+                code = max(code_matches, key=len).strip() if code_matches else broken_code
+                interpretation = "코드를 수정했습니다."
+                warnings = ""
+
+            # 코드 정밀 세척
+            code = self._detox_code(code, language)
+
+            return {
+                'code': code,
+                'interpretation': interpretation,
+                'warnings': warnings,
+                'raw_response': full_text
+            }
+
+        except Exception as e:
+            raise RuntimeError(f"코드 수정 실패: {str(e)}")
+
     def generate_with_context(
         self,
         user_input: str,
@@ -403,12 +499,12 @@ fig_resid
         """
         이전 분석을 고려한 연속 코드 생성
         """
-        
+
         context = "\n\n".join([
             f"# 이전 분석 {i+1}: {item['caption']}\n{item['code']}"
             for i, item in enumerate(previous_code[-3:])  # 최근 3개만
         ])
-        
+
         enhanced_prompt = f"""
 **이전 분석 내역:**
 {context}
@@ -418,10 +514,10 @@ fig_resid
 
 위 분석을 기반으로 다음 단계를 진행하세요.
 """
-        
+
         return self.generate_analysis_code(
-            enhanced_prompt, 
-            language=language, 
-            data_info=data_info, 
+            enhanced_prompt,
+            language=language,
+            data_info=data_info,
             target_variable=target_variable
         )

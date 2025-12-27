@@ -450,7 +450,37 @@ class QuartoRenderer:
             
             lines.append("```")
             lines.append("")
-            
+
+            # Execution Results (if available from Tab 2)
+            exec_result = chunk.get('execution_result', None)
+            if exec_result and exec_result.get('success'):
+                lines.append("")
+                lines.append("::: {.callout-tip icon=false}")
+                lines.append("### 📊 사전 실행 결과 (Tab 2에서 캡처됨)")
+                lines.append("")
+
+                # Show stdout if exists
+                if exec_result.get('stdout'):
+                    lines.append("**실행 출력:**")
+                    lines.append("```")
+                    lines.append(exec_result['stdout'])
+                    lines.append("```")
+                    lines.append("")
+
+                # Show figures if exists
+                if exec_result.get('figure_data'):
+                    lines.append("**생성된 그래프:**")
+                    lines.append("")
+                    for idx, fig_data in enumerate(exec_result['figure_data'], 1):
+                        if fig_data.startswith('<'):  # Plotly HTML
+                            lines.append(f"_Plotly 인터랙티브 그래프 #{idx} (QMD에서는 재실행됩니다)_")
+                        else:  # Base64 image
+                            lines.append(f"![사전 실행 그래프 #{idx}](data:image/png;base64,{fig_data})")
+                        lines.append("")
+
+                lines.append(":::")
+                lines.append("")
+
             # Interpretation - Using cleaner formatting
             if interpretation:
                 lines.append("")
@@ -463,7 +493,7 @@ class QuartoRenderer:
                 lines.append(clean_interp)
                 lines.append(":::")
                 lines.append("")
-            
+
             lines.append("---")
             lines.append("")
 

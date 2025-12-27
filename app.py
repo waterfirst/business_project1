@@ -428,6 +428,8 @@ with tab2:
 
                         # 코드 실행 및 결과 캡처 (Python만 지원)
                         execution_result = None
+                        auto_fix_attempted = False
+
                         if language.lower() == 'python':
                             with st.spinner("🔄 코드 실행 중..."):
                                 try:
@@ -470,8 +472,63 @@ with tab2:
                                                 else:  # base64 이미지
                                                     st.image(f"data:image/png;base64,{fig_data}")
                                     else:
+                                        # 에러 발생 시 자동 수정 시도
                                         st.error("❌ 코드 실행 실패")
                                         st.error(execution_result['error'])
+
+                                        # Gemini에게 수정 요청
+                                        if st.button("🔧 AI로 자동 수정 시도", key="auto_fix_btn"):
+                                            with st.spinner("🤖 Gemini가 코드를 수정하는 중..."):
+                                                try:
+                                                    fixed_result = st.session_state.generator.fix_code_error(
+                                                        broken_code=result['code'],
+                                                        error_message=execution_result['error'],
+                                                        language=language.lower(),
+                                                        data_info=data_info
+                                                    )
+
+                                                    st.success("✅ 코드 수정 완료!")
+                                                    st.subheader("🔧 수정된 코드")
+                                                    st.code(fixed_result['code'], language=language.lower())
+
+                                                    if fixed_result['interpretation']:
+                                                        st.info(f"💡 수정 내용: {fixed_result['interpretation']}")
+
+                                                    # 수정된 코드 재실행
+                                                    with st.spinner("🔄 수정된 코드 실행 중..."):
+                                                        execution_result = st.session_state.executor.execute_python_code(
+                                                            code=fixed_result['code'],
+                                                            data_path=data_path
+                                                        )
+
+                                                        if execution_result['success']:
+                                                            st.success("🎉 수정된 코드 실행 성공!")
+
+                                                            # 출력 결과 표시
+                                                            if execution_result['stdout']:
+                                                                st.subheader("📊 실행 결과")
+                                                                st.text(execution_result['stdout'])
+
+                                                            # 그래프 표시
+                                                            if execution_result['figure_data']:
+                                                                st.subheader("📈 생성된 그래프")
+                                                                for i, fig_data in enumerate(execution_result['figure_data'], 1):
+                                                                    if fig_data.startswith('<'):
+                                                                        st.components.v1.html(fig_data, height=600)
+                                                                    else:
+                                                                        st.image(f"data:image/png;base64,{fig_data}")
+
+                                                            # 수정된 코드를 result에 반영
+                                                            result = fixed_result
+                                                            auto_fix_attempted = True
+                                                        else:
+                                                            st.error("❌ 수정된 코드도 실행 실패")
+                                                            st.error(execution_result['error'])
+                                                            st.warning("💡 수동으로 코드를 수정하거나, 다른 방식으로 요청해주세요.")
+
+                                                except Exception as fix_error:
+                                                    st.error(f"❌ 자동 수정 실패: {str(fix_error)}")
+                                                    st.info("💡 리포트 생성 시 Quarto가 다시 실행을 시도합니다.")
 
                                 except Exception as exec_error:
                                     st.warning(f"⚠️ 코드 실행 중 오류: {str(exec_error)}")
@@ -494,7 +551,22 @@ with tab2:
                             'execution_result': execution_result  # 실행 결과 저장
                         })
 
-                        st.success(f"✅ 리포트 생성 탭으로 이동하세요! (총 {len(st.session_state.code_history)}개 분석)")
+                        # 성공 시 자동으로 Tab 3으로 안내
+                        if execution_result and execution_result['success']:
+                            st.success(f"🎉 분석 완료! (총 {len(st.session_state.code_history)}개)")
+                            st.info("👉 **3단계: 리포트 생성** 탭으로 이동하여 최종 리포트를 만들어보세요!")
+
+                            # Auto-scroll suggestion
+                            st.markdown("""
+                            <script>
+                                // Scroll to top to see tabs
+                                window.parent.document.querySelector('[data-testid="stVerticalBlock"]').scrollIntoView();
+                            </script>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.success(f"✅ 코드 저장 완료! (총 {len(st.session_state.code_history)}개 분석)")
+                            if not execution_result or not execution_result['success']:
+                                st.warning("⚠️ 코드 실행은 실패했지만 저장되었습니다. '3단계: 리포트 생성' 탭에서 Quarto가 다시 실행을 시도합니다.")
                         
                     except Exception as e:
                         error_msg = str(e)
