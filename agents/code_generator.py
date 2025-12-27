@@ -229,7 +229,29 @@ class BioCodeGenerator:
     def _detox_code(self, code: str, language: str) -> str:
         """뭉친 코드 분해 및 텍스트 자동 주석 처리 (v4.3)"""
         if not code: return ""
-        
+
+        # 0. JSON 구조가 남아있다면 제거
+        import json
+        import re
+
+        # Check if code starts with { (JSON object)
+        code_stripped = code.strip()
+        if code_stripped.startswith('{') and '"code"' in code_stripped:
+            try:
+                # Try to parse as JSON and extract code field
+                json_obj = json.loads(code_stripped)
+                if isinstance(json_obj, dict) and 'code' in json_obj:
+                    code = json_obj['code']
+                    if isinstance(code, list):
+                        code = '\n'.join(str(item) for item in code)
+            except:
+                # If JSON parsing fails, try regex extraction
+                code_match = re.search(r'"code"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', code_stripped, re.DOTALL)
+                if code_match:
+                    code = code_match.group(1)
+                    # Unescape JSON strings
+                    code = code.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
+
         # 1. 문자열 정규화
         code = code.replace("```", "").strip()
         
