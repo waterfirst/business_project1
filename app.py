@@ -4,6 +4,7 @@ import pandas as pd
 from agents.code_generator import BioCodeGenerator
 from agents.validator import ExperimentValidator
 from utils.quarto_renderer import QuartoRenderer
+from utils.simple_html_renderer import SimpleHTMLRenderer
 from utils.data_profiler import get_data_profile
 from utils.example_data import ExampleDatasets, AnalysisTemplates
 import tempfile
@@ -450,42 +451,83 @@ with tab2:
 
 # TAB 3: 리포트 생성
 with tab3:
-    st.header("📄 Quarto 리포트 생성")
-    
+    st.header("📄 리포트 생성")
+
     if not st.session_state.code_history:
         st.warning("'AI 분석' 탭에서 먼저 코드를 생성해주세요.")
     else:
         st.info(f"✅ 현재 **{len(st.session_state.code_history)}개의 분석**이 준비되었습니다.")
-        
+
+        # 리포트 생성 방식 선택
+        report_method = st.radio(
+            "리포트 생성 방식",
+            ["간단한 HTML (추천)", "Quarto 전문 리포트 (QMD → HTML/PDF)"],
+            help="간단한 HTML: Python만으로 즉시 생성 | Quarto: 고급 기능, Quarto CLI 필요"
+        )
+
         col1, col2 = st.columns(2)
         with col1:
-            output_format = st.selectbox(
-                "출력 형식",
-                ["HTML (웹 브라우저용)", "PDF (인쇄용)", "HTML + PDF"]
-            )
+            if report_method == "간단한 HTML (추천)":
+                output_format = "HTML (웹 브라우저용)"
+            else:
+                output_format = st.selectbox(
+                    "출력 형식",
+                    ["HTML (웹 브라우저용)", "PDF (인쇄용)", "HTML + PDF"]
+                )
         with col2:
             include_code = st.checkbox("코드 포함", value=True)
-        
+
         theme = st.selectbox(
             "문서 테마",
             ["cosmo", "flatly", "darkly", "journal", "sketchy"]
         )
         
         if st.button("📄 최종 리포트 생성", type="primary", use_container_width=True):
-            with st.spinner("📝 Quarto 문서 렌더링 중..."):
-                try:
-                    # Prepare data file path if data is uploaded
-                    data_file_path = None
-                    if st.session_state.uploaded_data is not None:
-                        # Save uploaded data to temp file
-                        import tempfile
-                        temp_data = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8')
-                        st.session_state.uploaded_data.to_csv(temp_data.name, index=False, encoding='utf-8')
-                        data_file_path = temp_data.name
-                        temp_data.close()
-                    
-                    # Step 1: Create QMD file
-                    qmd_path = st.session_state.renderer.create_qmd_document(
+            # 간단한 HTML 방식
+            if report_method == "간단한 HTML (추천)":
+                with st.spinner("📝 HTML 리포트 생성 중..."):
+                    try:
+                        html_content = SimpleHTMLRenderer.create_html_report(
+                            title=exp_title,
+                            author=exp_author,
+                            experiment_date=str(exp_date),
+                            code_chunks=st.session_state.code_history,
+                            theme=theme,
+                            include_code=include_code
+                        )
+
+                        st.success("🎉 HTML 리포트 생성 완료!")
+
+                        st.download_button(
+                            label="📥 HTML 리포트 다운로드",
+                            data=html_content,
+                            file_name=f"{exp_title}_{exp_date}.html",
+                            mime="text/html",
+                            use_container_width=True
+                        )
+
+                        with st.expander("📄 리포트 미리보기"):
+                            st.components.v1.html(html_content, height=600, scrolling=True)
+
+                    except Exception as e:
+                        st.error(f"❌ HTML 생성 실패: {str(e)}")
+
+            # Quarto 방식
+            else:
+                with st.spinner("📝 Quarto 문서 렌더링 중..."):
+                    try:
+                        # Prepare data file path if data is uploaded
+                        data_file_path = None
+                        if st.session_state.uploaded_data is not None:
+                            # Save uploaded data to temp file
+                            import tempfile
+                            temp_data = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8')
+                            st.session_state.uploaded_data.to_csv(temp_data.name, index=False, encoding='utf-8')
+                            data_file_path = temp_data.name
+                            temp_data.close()
+
+                        # Step 1: Create QMD file
+                        qmd_path = st.session_state.renderer.create_qmd_document(
                         title=exp_title,
                         author=exp_author,
                         experiment_date=str(exp_date),
