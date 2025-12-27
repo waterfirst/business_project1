@@ -7,6 +7,7 @@ from utils.quarto_renderer import QuartoRenderer
 from utils.simple_html_renderer import SimpleHTMLRenderer
 from utils.data_profiler import get_data_profile
 from utils.example_data import ExampleDatasets, AnalysisTemplates
+from utils.code_executor import CodeExecutor
 import tempfile
 from pathlib import Path
 from datetime import datetime
@@ -123,6 +124,13 @@ if 'validator' not in st.session_state:
     
 if 'renderer' not in st.session_state:
     st.session_state.renderer = QuartoRenderer()
+
+if 'executor' not in st.session_state:
+    # Create temp directory for execution results
+    import tempfile
+    temp_dir = tempfile.mkdtemp(prefix='dataviz_')
+    st.session_state.executor = CodeExecutor(temp_dir=temp_dir)
+    st.session_state.temp_dir = temp_dir
 
 if 'code_history' not in st.session_state:
     st.session_state.code_history = []
@@ -414,26 +422,78 @@ with tab2:
                             )
                         
                         st.success("✅ 코드 생성 완료!")
-                        
+
                         st.subheader("📝 생성된 코드")
                         st.code(result['code'], language=language.lower())
-                        
+
+                        # 코드 실행 및 결과 캡처 (Python만 지원)
+                        execution_result = None
+                        if language.lower() == 'python':
+                            with st.spinner("🔄 코드 실행 중..."):
+                                try:
+                                    # 데이터 파일 경로 준비
+                                    data_path = None
+                                    if st.session_state.uploaded_data is not None:
+                                        # Save to temp file
+                                        import tempfile
+                                        temp_data = tempfile.NamedTemporaryFile(
+                                            mode='w',
+                                            suffix='.csv',
+                                            delete=False,
+                                            encoding='utf-8',
+                                            dir=st.session_state.temp_dir
+                                        )
+                                        st.session_state.uploaded_data.to_csv(temp_data.name, index=False, encoding='utf-8')
+                                        data_path = temp_data.name
+                                        temp_data.close()
+
+                                    # 코드 실행
+                                    execution_result = st.session_state.executor.execute_python_code(
+                                        code=result['code'],
+                                        data_path=data_path
+                                    )
+
+                                    if execution_result['success']:
+                                        st.success("✅ 코드 실행 성공!")
+
+                                        # 출력 결과 표시
+                                        if execution_result['stdout']:
+                                            st.subheader("📊 실행 결과")
+                                            st.text(execution_result['stdout'])
+
+                                        # 그래프 표시
+                                        if execution_result['figure_data']:
+                                            st.subheader("📈 생성된 그래프")
+                                            for i, fig_data in enumerate(execution_result['figure_data'], 1):
+                                                if fig_data.startswith('<'):  # HTML (Plotly)
+                                                    st.components.v1.html(fig_data, height=600)
+                                                else:  # base64 이미지
+                                                    st.image(f"data:image/png;base64,{fig_data}")
+                                    else:
+                                        st.error("❌ 코드 실행 실패")
+                                        st.error(execution_result['error'])
+
+                                except Exception as exec_error:
+                                    st.warning(f"⚠️ 코드 실행 중 오류: {str(exec_error)}")
+                                    st.info("💡 리포트 생성 시 Quarto가 다시 실행을 시도합니다.")
+
                         if result['interpretation']:
                             st.subheader("💡 결과 해석")
                             st.info(result['interpretation'])
-                        
+
                         if result['warnings']:
                             st.subheader("⚠️ 주의사항")
                             st.warning(result['warnings'])
-                        
+
                         st.session_state.code_history.append({
                             'language': language.lower(),
                             'code': result['code'],
                             'caption': user_request[:50] + "...",
                             'interpretation': result['interpretation'],
-                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'execution_result': execution_result  # 실행 결과 저장
                         })
-                        
+
                         st.success(f"✅ 리포트 생성 탭으로 이동하세요! (총 {len(st.session_state.code_history)}개 분석)")
                         
                     except Exception as e:
