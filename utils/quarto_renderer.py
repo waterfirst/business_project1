@@ -203,8 +203,19 @@ class QuartoRenderer:
                 code = str(code_raw) if code_raw else ''
             code = code.strip()
 
-            caption = chunk.get('caption', f'Analysis {i}')
-            interpretation = chunk.get('interpretation', '')
+            # Handle caption that might be a list
+            caption_raw = chunk.get('caption', f'Analysis {i}')
+            if isinstance(caption_raw, list):
+                caption = ' '.join(str(item) for item in caption_raw)
+            else:
+                caption = str(caption_raw) if caption_raw else f'Analysis {i}'
+
+            # Handle interpretation that might be a list
+            interp_raw = chunk.get('interpretation', '')
+            if isinstance(interp_raw, list):
+                interpretation = '\n'.join(str(item) for item in interp_raw)
+            else:
+                interpretation = str(interp_raw) if interp_raw else ''
             
             # Ensure code blocks start at Col 0
             lines.append(f"## 분석 {i}: {caption}")
