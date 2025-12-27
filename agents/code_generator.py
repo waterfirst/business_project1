@@ -134,17 +134,23 @@ class BioCodeGenerator:
             
             # JSON 파싱
             import json
+
+            # 변수 초기화 (fallback 대비)
+            code = ""
+            interpretation = ""
+            warnings = ""
+
             try:
                 data = json.loads(full_text)
                 code = data.get('code', '')
                 interpretation = data.get('interpretation', '')
                 warnings = data.get('warnings', '')
             except json.JSONDecodeError:
-                #Fallback: 기존의 텍스트 파싱 로직 (만약 JSON 모드가 실패할 경우 대비)
+                # Fallback: 기존의 텍스트 파싱 로직 (만약 JSON 모드가 실패할 경우 대비)
                 code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
                 code_matches = re.findall(code_pattern, full_text, re.DOTALL | re.IGNORECASE)
                 code = max(code_matches, key=len).strip() if code_matches else full_text
-                
+
                 interp_match = re.search(r'"interpretation":\s*"(.*?)"', full_text, re.DOTALL)
                 interpretation = interp_match.group(1) if interp_match else ""
                 warnings = ""
