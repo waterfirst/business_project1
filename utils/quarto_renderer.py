@@ -223,17 +223,17 @@ class QuartoRenderer:
             else:
                 # Simple string without quotes (safer for YAML)
                 lines.append(f'#| fig-cap: {clean_caption}')
-            lines.append("#| echo: false")  # Hide code
+            lines.append("#| echo: true")   # Show code (students can learn from it)
             lines.append("#| eval: true")   # Execute code to show results
-            lines.append("#| output: true") # Show output (tables, plots, etc.)
+            lines.append("#| output: asis") # Show output as-is (better for plots)
             lines.append("#| warning: false")
             lines.append("#| error: true")  # Show errors so we can debug
-            lines.append("#| include: true") # Include output even if errors occur
             # For Python plots to display properly
             if lang == 'python':
                 lines.append("#| fig-width: 12")
                 lines.append("#| fig-height: 8")
                 lines.append("#| fig-dpi: 300")
+                lines.append("#| fig-format: retina")  # High-res displays
             
             # Add data loading and setup if data file is provided
             if self.data_file_path:
@@ -244,26 +244,36 @@ class QuartoRenderer:
                 if lang == 'python':
                     # Only add data loading if not already in code
                     if 'read_csv' not in code.lower() and 'pd.read_csv' not in code.lower():
-                        lines.append("# Load data")
+                        lines.append("# 데이터 로드")
                         lines.append("import pandas as pd")
                         lines.append(f"df = pd.read_csv('{data_file_name}')")
                         lines.append("")
-                    
-                    # Ensure matplotlib is configured for Quarto (add if not present)
-                    if 'matplotlib' not in code.lower() and 'plt' not in code.lower():
-                        lines.append("# 시각화 설정 (Seaborn & 한글 폰트)")
-                        lines.append("import matplotlib.pyplot as plt")
-                        lines.append("import seaborn as sns")
-                        lines.append("sns.set_theme(style='whitegrid')")
-                        lines.append("import platform")
-                        lines.append("if platform.system() == 'Windows':")
-                        lines.append("    plt.rc('font', family='Malgun Gothic')")
-                        lines.append("elif platform.system() == 'Darwin':")
-                        lines.append("    plt.rc('font', family='AppleGothic')")
-                        lines.append("else:")
-                        lines.append("    plt.rc('font', family='NanumGothic')")
-                        lines.append("plt.rcParams['axes.unicode_minus'] = False")
-                        lines.append("")
+
+                    # Plotly 지원 추가 (인터랙티브 차트용)
+                    if 'plotly' in code.lower() or 'px.' in code.lower():
+                        if 'import plotly' not in code.lower():
+                            lines.append("# Plotly 인터랙티브 시각화 설정")
+                            lines.append("import plotly.express as px")
+                            lines.append("import plotly.graph_objects as go")
+                            lines.append("")
+
+                    # Matplotlib/Seaborn 지원 (정적 차트용)
+                    if ('matplotlib' in code.lower() or 'plt.' in code.lower() or
+                        'seaborn' in code.lower() or 'sns.' in code.lower()):
+                        if 'import matplotlib' not in code.lower():
+                            lines.append("# Matplotlib/Seaborn 시각화 설정 (한글 폰트 지원)")
+                            lines.append("import matplotlib.pyplot as plt")
+                            lines.append("import seaborn as sns")
+                            lines.append("sns.set_theme(style='whitegrid', palette='Set2')")
+                            lines.append("import platform")
+                            lines.append("if platform.system() == 'Windows':")
+                            lines.append("    plt.rc('font', family='Malgun Gothic')")
+                            lines.append("elif platform.system() == 'Darwin':")
+                            lines.append("    plt.rc('font', family='AppleGothic')")
+                            lines.append("else:")
+                            lines.append("    plt.rc('font', family='NanumGothic')")
+                            lines.append("plt.rcParams['axes.unicode_minus'] = False")
+                            lines.append("")
                 elif lang == 'r':
                     lines.append("# 한글 폰트 및 시각화 설정")
                     lines.append("if(Sys.info()['sysname'] == 'Windows') try(windowsFonts(Malgun = windowsFont('Malgun Gothic')), silent=TRUE)")
@@ -315,12 +325,14 @@ class QuartoRenderer:
                 
                 cleaned_code = '\n'.join(cleaned_code_lines)
                 lines.append(cleaned_code)
-                
-                # 그래프 출력을 위해 plt.show() 자동 추가
+
+                # Quarto Jupyter 엔진에서는 plt.show() 대신 자동 디스플레이 사용
+                # plt.show()를 제거하거나 주석 처리 (Quarto가 자동으로 출력)
                 if lang == 'python' and ('plt.' in cleaned_code or 'sns.' in cleaned_code or '.plot(' in cleaned_code):
-                    if 'plt.show()' not in cleaned_code:
+                    # Ensure tight layout for better appearance
+                    if 'plt.tight_layout()' not in cleaned_code:
                         lines.append("")
-                        lines.append("plt.show()")
+                        lines.append("plt.tight_layout()  # Better spacing")
                 
                 # For Python: Ensure outputs are displayed
                 # Find result variables BEFORE adding to code block

@@ -5,15 +5,108 @@ from agents.code_generator import BioCodeGenerator
 from agents.validator import ExperimentValidator
 from utils.quarto_renderer import QuartoRenderer
 from utils.data_profiler import get_data_profile
+from utils.example_data import ExampleDatasets, AnalysisTemplates
 import tempfile
 from pathlib import Path
 from datetime import datetime
 
 st.set_page_config(
-    page_title="Bio-Log - Google Cloud Edition",
-    page_icon="🧬",
-    layout="wide"
+    page_title="DataViz Campus - AI 데이터 분석 학습 플랫폼",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# 커스텀 CSS - 대학생 친화적 디자인
+st.markdown("""
+<style>
+    /* 메인 색상: 모던하고 밝은 파스텔 톤 */
+    :root {
+        --primary-color: #6366f1;  /* 인디고 */
+        --secondary-color: #8b5cf6;  /* 바이올렛 */
+        --accent-color: #ec4899;  /* 핑크 */
+        --success-color: #10b981;  /* 그린 */
+        --warning-color: #f59e0b;  /* 앰버 */
+    }
+
+    /* 헤더 스타일링 */
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    }
+
+    .main-header h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .main-header p {
+        font-size: 1.1rem;
+        margin: 0.5rem 0 0 0;
+        opacity: 0.95;
+    }
+
+    /* 카드 스타일 */
+    .info-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border-left: 5px solid #667eea;
+        margin: 1rem 0;
+    }
+
+    .info-card h3 {
+        color: #667eea;
+        margin-top: 0;
+    }
+
+    /* 버튼 스타일 */
+    .stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    /* 성공 메시지 스타일 */
+    .success-box {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+    }
+
+    /* 탭 스타일 개선 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 10px 10px 0 0;
+        padding: 10px 20px;
+        font-weight: 600;
+    }
+
+    /* 메트릭 카드 */
+    div[data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #667eea;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # 세션 상태 초기화
 if 'generator' not in st.session_state:
@@ -36,13 +129,13 @@ if 'code_history' not in st.session_state:
 if 'uploaded_data' not in st.session_state:
     st.session_state.uploaded_data = None
 
-# 헤더
-col1, col2 = st.columns([3, 1])
-with col1:
-    st.title("🧬 Bio-Log")
-    st.subheader("Google Gemini 기반 실험 데이터 자동 분석 플랫폼")
-with col2:
-    st.image("https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg", width=100)
+# 헤더 - 대학생 친화적
+st.markdown("""
+<div class="main-header">
+    <h1>📊 DataViz Campus</h1>
+    <p>🎓 대학생을 위한 AI 기반 데이터 분석 학습 플랫폼 | Powered by Google Gemini 2.5 Flash</p>
+</div>
+""", unsafe_allow_html=True)
 
 # API 키 체크
 if not st.session_state.model_loaded:
@@ -55,19 +148,33 @@ if not st.session_state.model_loaded:
     """)
     st.stop()
 
-# 사이드바
+# 사이드바 - 학생 친화적 디자인
 with st.sidebar:
-    st.header("📋 실험 정보")
-    exp_title = st.text_input("실험 제목", "ELISA 실험")
-    exp_author = st.text_input("실험자", "Team Anti-Gravity")
-    exp_date = st.date_input("실험 날짜", datetime.now())
-    
+    st.markdown("### 📚 프로젝트 설정")
+
+    exp_title = st.text_input(
+        "분석 제목",
+        "나의 데이터 분석 프로젝트",
+        help="리포트 상단에 표시될 제목입니다"
+    )
+    exp_author = st.text_input(
+        "분석자 이름",
+        "대학생",
+        help="본인의 이름 또는 팀명을 입력하세요"
+    )
+    exp_date = st.date_input(
+        "분석 날짜",
+        datetime.now(),
+        help="분석을 수행한 날짜"
+    )
+
     st.divider()
-    
+
+    st.markdown("### 🤖 AI 모델 설정")
     model_choice = st.selectbox(
         "Gemini 모델",
         ["gemini-2.5-flash (추천)", "gemini-2.0-flash"],
-        help="2.5 Flash: 비전 및 일반 작업 최적화 / 2.0 Flash: 최신 모델 (할당량 주의)",
+        help="💡 2.5 Flash 권장: 더 안정적이고 할당량이 많습니다",
         key="model_selector"
     )
     
@@ -96,18 +203,51 @@ with st.sidebar:
         st.session_state.uploaded_data = None
         st.rerun()
 
-# 메인 영역
-tab1, tab2, tab3, tab4 = st.tabs(["📊 데이터 입력", "🤖 AI 분석", "📄 리포트 생성", "📚 사용 가이드"])
+# 메인 영역 - 탭에 더 명확한 설명 추가
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📊 1단계: 데이터",
+    "🤖 2단계: AI 분석",
+    "📄 3단계: 리포트",
+    "💡 예제 & 템플릿",
+    "📚 사용 가이드"
+])
 
 # TAB 1: 데이터 입력
 with tab1:
-    st.header("데이터 업로드 및 검증")
-    
-    uploaded_file = st.file_uploader(
-        "CSV 파일을 업로드하세요",
-        type=['csv'],
-        help="실험 데이터가 포함된 CSV 파일"
-    )
+    st.markdown("### 📊 데이터 준비하기")
+    st.info("💡 **시작하기**: 분석할 CSV 파일을 업로드하거나, 아래 '예제 & 템플릿' 탭에서 연습용 데이터를 사용해보세요!")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        uploaded_file = st.file_uploader(
+            "📁 CSV 파일 선택",
+            type=['csv'],
+            help="쉼표로 구분된 데이터 파일 (.csv)을 업로드하세요"
+        )
+
+    with col2:
+        st.markdown("#### 💾 예제 데이터 다운로드")
+        if st.button("📥 학생 성적 데이터", use_container_width=True):
+            example_df = ExampleDatasets.create_student_grades()
+            csv = example_df.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                "⬇️ 다운로드 (student_grades.csv)",
+                csv,
+                "student_grades.csv",
+                "text/csv",
+                use_container_width=True
+            )
+        if st.button("📥 실험 측정 데이터", use_container_width=True):
+            example_df = ExampleDatasets.create_experiment_measurements()
+            csv = example_df.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                "⬇️ 다운로드 (experiment_data.csv)",
+                csv,
+                "experiment_data.csv",
+                "text/csv",
+                use_container_width=True
+            )
     
     if uploaded_file:
         try:
@@ -168,41 +308,70 @@ with tab1:
 
 # TAB 2: AI 분석
 with tab2:
-    st.header("🤖 Gemini AI 코드 생성")
-    
+    st.markdown("### 🤖 AI와 함께 데이터 분석하기")
+
     if st.session_state.uploaded_data is None:
-        st.warning("먼저 '데이터 입력' 탭에서 CSV 파일을 업로드해주세요.")
+        st.warning("⚠️ 먼저 **'1단계: 데이터'** 탭에서 CSV 파일을 업로드해주세요!")
+        st.info("👉 예제 데이터로 연습하고 싶다면 '예제 & 템플릿' 탭을 확인하세요.")
     else:
         df = st.session_state.uploaded_data
-        
+
+        st.success(f"✅ 데이터 로드 완료! {len(df)}행 × {len(df.columns)}열")
+
         with st.sidebar:
             st.divider()
-            st.subheader("🎯 분석 설정")
+            st.markdown("### 🎯 분석 초점")
             target_var = st.selectbox(
                 "종속 변수 (Target)",
-                ["결정하지 않음"] + df.columns.tolist(),
-                help="분석의 핵심이 되는 변수를 선택하세요. EDA 및 상관 분석에 활용됩니다."
+                ["없음 - 일반 탐색"] + df.columns.tolist(),
+                help="📌 특정 변수를 예측하거나 분석하고 싶다면 선택하세요. AI가 해당 변수 중심으로 분석합니다."
             )
-            target_variable = None if target_var == "결정하지 않음" else target_var
-            
+            target_variable = None if target_var == "없음 - 일반 탐색" else target_var
+
         data_info = get_data_profile(df)
-        
-        with st.expander("📝 데이터 프로필 요약 (AI에 전달됨)", expanded=False):
-            st.markdown(data_info)
-        
-        with st.expander("💡 프롬프트 예시 보기"):
+
+        # 템플릿 선택 추가
+        st.markdown("#### 🎨 분석 템플릿 (선택사항)")
+        templates = AnalysisTemplates.get_templates()
+        template_options = ["직접 입력"] + [f"{v['name']}" for k, v in templates.items()]
+
+        selected_template = st.selectbox(
+            "자주 사용하는 분석 유형 선택",
+            template_options,
+            help="템플릿을 선택하면 프롬프트가 자동으로 채워집니다"
+        )
+
+        # 템플릿 선택 시 프롬프트 자동 입력
+        default_prompt = ""
+        if selected_template != "직접 입력":
+            template_key = [k for k, v in templates.items() if v['name'] == selected_template][0]
+            default_prompt = templates[template_key]['prompt']
+            st.info(f"📝 선택한 템플릿: **{selected_template}**")
+
+        with st.expander("💡 프롬프트 예시 더 보기", expanded=False):
             st.markdown("""
-            **기초 통계:**
-            - "각 그룹별 평균과 표준편차를 계산하고 막대그래프로 시각화하세요"
-            
-            **가설 검정:**
-            - "3개 그룹 간 차이를 ANOVA로 검정하고, Tukey HSD 사후검정을 수행하세요"
+            **🔢 기술통계:**
+            - "각 변수의 평균, 중앙값, 표준편차를 계산하고 히스토그램으로 분포를 보여주세요"
+            - "그룹별 요약 통계를 표로 만들고 박스플롯으로 비교해주세요"
+
+            **📊 시각화:**
+            - "Plotly로 인터랙티브한 scatter plot을 만들어주세요"
+            - "변수 간 상관관계를 히트맵으로 보여주세요"
+
+            **📈 가설 검정:**
+            - "두 그룹 간 평균 차이가 유의한지 T-test로 검정해주세요"
+            - "3개 그룹 간 차이를 ANOVA로 검정하고 사후검정도 수행해주세요"
+
+            **🔍 회귀 분석:**
+            - "X 변수로 Y 변수를 예측하는 회귀 모델을 만들고 R-squared를 계산해주세요"
             """)
         
         user_request = st.text_area(
-            "원하는 분석을 자연어로 입력하세요",
-            placeholder="예: CT 값을 그룹별로 비교하고, 통계적으로 유의한지 검정해주세요",
-            height=120
+            "🗣️ AI에게 요청할 분석 내용",
+            value=default_prompt,
+            placeholder="예: 전공별로 성적을 비교하고, 통계적으로 유의한 차이가 있는지 ANOVA로 검정해주세요",
+            height=120,
+            help="평소에 말하듯이 편하게 적어주세요! AI가 이해하고 코드를 생성합니다."
         )
         
         col1, col2 = st.columns([3, 1])
@@ -387,28 +556,217 @@ with tab3:
                 except Exception as e:
                     st.error(f"오류 발생: {str(e)}")
 
-# TAB 4: 사용 가이드
+# TAB 4: 예제 & 템플릿
 with tab4:
-    st.header("📚 Bio-Log 사용 가이드")
+    st.markdown("### 💡 예제 데이터 & 분석 템플릿")
+    st.info("🎓 **학습 팁**: 예제 데이터로 먼저 연습해보세요! 다양한 분석 방법을 배울 수 있습니다.")
+
+    # 예제 데이터셋 소개
+    st.markdown("#### 📦 제공되는 예제 데이터셋")
+
+    datasets_info = ExampleDatasets.get_dataset_info()
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("##### 🎓 학생 성적 데이터")
+        info = datasets_info['student_grades']
+        st.write(f"**{info['description']}**")
+        st.write(f"📏 크기: {info['rows']}행 × {info['columns']}열")
+        st.write("**활용 예시:**")
+        for use_case in info['use_cases']:
+            st.write(f"- {use_case}")
+
+        if st.button("📥 성적 데이터 다운로드", key="dl_grades", use_container_width=True):
+            df = ExampleDatasets.create_student_grades()
+            csv = df.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                "⬇️ student_grades.csv",
+                csv,
+                "student_grades.csv",
+                "text/csv",
+                key="dl_grades_btn",
+                use_container_width=True
+            )
+
+    with col2:
+        st.markdown("##### 🧪 실험 측정 데이터")
+        info = datasets_info['experiment_measurements']
+        st.write(f"**{info['description']}**")
+        st.write(f"📏 크기: {info['rows']}행 × {info['columns']}열")
+        st.write("**활용 예시:**")
+        for use_case in info['use_cases']:
+            st.write(f"- {use_case}")
+
+        if st.button("📥 실험 데이터 다운로드", key="dl_exp", use_container_width=True):
+            df = ExampleDatasets.create_experiment_measurements()
+            csv = df.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                "⬇️ experiment_data.csv",
+                csv,
+                "experiment_data.csv",
+                "text/csv",
+                key="dl_exp_btn",
+                use_container_width=True
+            )
+
+    with col3:
+        st.markdown("##### 📊 설문조사 데이터")
+        info = datasets_info['survey_data']
+        st.write(f"**{info['description']}**")
+        st.write(f"📏 크기: {info['rows']}행 × {info['columns']}열")
+        st.write("**활용 예시:**")
+        for use_case in info['use_cases']:
+            st.write(f"- {use_case}")
+
+        if st.button("📥 설문 데이터 다운로드", key="dl_survey", use_container_width=True):
+            df = ExampleDatasets.create_survey_data()
+            csv = df.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                "⬇️ survey_data.csv",
+                csv,
+                "survey_data.csv",
+                "text/csv",
+                key="dl_survey_btn",
+                use_container_width=True
+            )
+
+    st.divider()
+
+    # 분석 템플릿 소개
+    st.markdown("#### 🎨 분석 템플릿 라이브러리")
+    st.write("자주 사용하는 분석 유형의 프롬프트 템플릿입니다. **'2단계: AI 분석'** 탭에서 선택할 수 있습니다.")
+
+    templates = AnalysisTemplates.get_templates()
+
+    for key, template in templates.items():
+        with st.expander(f"📌 {template['name']}", expanded=False):
+            st.markdown(f"**프롬프트 예시:**")
+            st.code(template['prompt'], language='text')
+            st.markdown(f"**태그:** {', '.join([f'`{tag}`' for tag in template['tags']])}")
+
+# TAB 5: 사용 가이드
+with tab5:
+    st.markdown("### 📚 DataViz Campus 사용 가이드")
+
     st.markdown("""
-    ## 🚀 빠른 시작
-    
-    1. **데이터 업로드**: CSV 파일 준비
-    2. **AI 분석 요청**: 자연어로 분석 설명
-    3. **리포트 다운로드**: HTML/PDF 선택
-    
-    ## 💡 팁
-    - 구체적인 프롬프트 작성
-    - 여러 분석을 순차적으로 수행
-    - 결과를 항상 검토
+    ## 🎯 이 플랫폼은 무엇인가요?
+
+    **DataViz Campus**는 대학생들이 데이터 분석을 쉽게 배우고 실습할 수 있도록 만든 AI 기반 학습 플랫폼입니다.
+
+    ### ✨ 주요 기능
+    - 🤖 **AI 코드 생성**: 자연어로 요청하면 Python 분석 코드 자동 생성
+    - 📊 **인터랙티브 시각화**: Plotly를 활용한 줌 가능한 그래프
+    - 📄 **자동 리포트**: HTML/PDF 형식의 전문적인 분석 보고서
+    - 🎓 **교육적 설명**: 통계 용어와 결과를 학생 눈높이로 해석
+    - 💾 **예제 데이터**: 연습용 데이터셋 3종 제공
+
+    ---
+
+    ## 🚀 3단계로 시작하기
+
+    ### 1️⃣ 데이터 준비
+    - **본인 데이터**: CSV 파일을 '1단계: 데이터' 탭에서 업로드
+    - **예제 데이터**: '예제 & 템플릿' 탭에서 다운로드하여 연습
+
+    ### 2️⃣ AI에게 분석 요청
+    - '2단계: AI 분석' 탭으로 이동
+    - 템플릿 선택 또는 직접 입력
+    - 예: *"전공별로 성적을 비교하고 통계적 차이를 검정해주세요"*
+    - 🚀 버튼 클릭!
+
+    ### 3️⃣ 리포트 생성
+    - '3단계: 리포트' 탭으로 이동
+    - 원하는 형식 선택 (HTML 추천 - 인터랙티브!)
+    - 테마 선택 (cosmo, flatly 등)
+    - 📄 버튼 클릭하여 다운로드
+
+    ---
+
+    ## 💡 효과적인 프롬프트 작성법
+
+    ### ✅ 좋은 프롬프트 예시
+    - "전공별 중간고사 평균을 비교하고, ANOVA로 유의한 차이가 있는지 검정해주세요"
+    - "농도와 흡광도의 상관관계를 scatter plot으로 그리고 회귀식을 구해주세요"
+    - "Plotly로 성별과 연령대에 따른 만족도 분포를 인터랙티브하게 보여주세요"
+
+    ### ❌ 모호한 프롬프트 예시
+    - "분석해주세요" (무엇을?)
+    - "그래프 그려주세요" (어떤 변수를?)
+    - "통계 내주세요" (어떤 검정을?)
+
+    ### 🔑 팁
+    1. **구체적으로**: 어떤 변수를, 어떤 방법으로, 어떻게 시각화할지 명시
+    2. **한 번에 하나씩**: 복잡한 분석은 단계별로 나눠서 요청
+    3. **이전 분석 참고**: "이전 분석 참고" 체크박스 활용
+
+    ---
+
+    ## 🔬 통계 용어 설명
+
+    ### 📊 기술통계
+    - **평균 (Mean)**: 모든 값을 더한 후 개수로 나눈 값
+    - **중앙값 (Median)**: 크기 순으로 정렬했을 때 가운데 값
+    - **표준편차 (Std)**: 데이터가 평균에서 얼마나 퍼져있는지
+
+    ### 🧪 가설검정
+    - **T-test**: 두 그룹의 평균이 다른지 검정
+    - **ANOVA**: 3개 이상 그룹의 평균이 다른지 검정
+    - **P-value**: 0.05보다 작으면 "통계적으로 유의함"
+
+    ### 📈 회귀분석
+    - **R-squared**: 모델의 설명력 (1에 가까울수록 좋음)
+    - **회귀식**: Y = aX + b 형태의 예측 공식
+
+    ---
+
+    ## ⚙️ 시스템 요구사항
+
+    ### 필수 소프트웨어
+    - ✅ Python 3.8 이상
+    - ✅ Quarto CLI ([quarto.org](https://quarto.org) 에서 설치)
+    - ✅ Google API 키 (무료: [ai.google.dev](https://ai.google.dev))
+
+    ### 선택사항 (PDF 생성 시)
+    - LaTeX (TinyTeX): `quarto install tinytex` 명령어로 설치
+
+    ---
+
+    ## 🆘 자주 묻는 질문 (FAQ)
+
+    **Q1. "API 할당량 초과" 오류가 나요**
+    - 무료 API는 하루 20회 제한이 있습니다
+    - 사이드바에서 다른 모델(2.0 Flash)로 변경해보세요
+    - 또는 몇 분 후 다시 시도
+
+    **Q2. 그래프가 리포트에 안 나와요**
+    - 최신 버전은 Plotly를 우선 사용합니다 (자동 렌더링)
+    - Matplotlib는 `plt.show()` 제거됨 (Quarto가 자동 처리)
+
+    **Q3. 한글이 깨져요**
+    - Windows: 맑은 고딕 자동 설정
+    - Mac: AppleGothic 자동 설정
+    - 시스템 폰트가 없으면 설치 필요
+
+    **Q4. 어떤 분석부터 시작하면 좋나요?**
+    1. 기술통계 (평균, 표준편차)
+    2. 시각화 (히스토그램, 박스플롯)
+    3. 가설검정 (T-test, ANOVA)
+    4. 회귀분석 (관계 파악)
+
+    ---
+
+    ## 📞 문의 & 피드백
+
+    버그 리포트나 기능 제안은 GitHub Issues로 남겨주세요!
     """)
 
-# 푸터
+# 푸터 - 학생 친화적
 st.divider()
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.caption("Bio-Log v2.0 (Google Cloud Edition)")
-with col2:
-    st.caption("Powered by Google Gemini 2.5")
-with col3:
-    st.caption("Team Anti-Gravity © 2025")
+st.markdown("""
+<div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white;'>
+    <h4 style='margin: 0;'>📊 DataViz Campus</h4>
+    <p style='margin: 0.5rem 0; opacity: 0.9;'>대학생을 위한 AI 데이터 분석 학습 플랫폼</p>
+    <p style='margin: 0; font-size: 0.9rem;'>v4.0 Student Edition | Powered by Google Gemini 2.5 Flash | 2025</p>
+</div>
+""", unsafe_allow_html=True)
