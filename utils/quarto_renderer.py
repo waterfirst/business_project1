@@ -293,6 +293,25 @@ class QuartoRenderer:
             
             # Add the actual code
             if code:
+                # Safety check: Remove JSON wrapper if it exists (belt and suspenders)
+                code = code.strip()
+                if code.startswith('{') and '"code"' in code:
+                    try:
+                        # Try to parse as JSON and extract code field
+                        import json as json_lib
+                        json_obj = json_lib.loads(code)
+                        if isinstance(json_obj, dict) and 'code' in json_obj:
+                            code = json_obj['code']
+                            if isinstance(code, list):
+                                code = '\n'.join(str(item) for item in code)
+                    except:
+                        # If JSON parsing fails, try regex extraction
+                        code_match = re.search(r'"code"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', code, re.DOTALL)
+                        if code_match:
+                            code = code_match.group(1)
+                            # Unescape JSON strings
+                            code = code.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
+
                 # Clean up code: ensure proper line breaks and comment handling
                 code_lines = code.split('\n')
                 cleaned_code_lines = []
@@ -301,11 +320,11 @@ class QuartoRenderer:
                     if not line:
                         cleaned_code_lines.append("")
                         continue
-                    
+
                     # Fix: if line starts with a number and period (like "1. 데이터 로드"), make it a comment
                     if re.match(r'^\d+\.\s+', line) and not line.startswith('#'):
                         line = f"# {line}"
-                    
+
                     # Fix: split multiple imports on one line
                     # Check for multiple "import" keywords in the line
                     if line.startswith('import ') and line.count('import ') > 1:
@@ -320,9 +339,9 @@ class QuartoRenderer:
                             else:
                                 cleaned_code_lines.append(f"import {part}")
                         continue
-                    
+
                     cleaned_code_lines.append(line)
-                
+
                 cleaned_code = '\n'.join(cleaned_code_lines)
                 lines.append(cleaned_code)
 

@@ -319,6 +319,16 @@ with tab2:
 
         st.success(f"✅ 데이터 로드 완료! {len(df)}행 × {len(df.columns)}열")
 
+        # Show existing analyses first
+        if st.session_state.code_history:
+            st.markdown(f"### 📝 생성된 분석 ({len(st.session_state.code_history)}개)")
+            for idx, item in enumerate(st.session_state.code_history, 1):
+                with st.expander(f"분석 #{idx}: {item['caption']}", expanded=False):
+                    st.code(item['code'], language=item['language'])
+                    if item.get('interpretation'):
+                        st.info(f"💡 {item['interpretation']}")
+                    st.caption(f"생성 시간: {item['timestamp']}")
+
         with st.sidebar:
             st.divider()
             st.markdown("### 🎯 분석 초점")
@@ -501,36 +511,20 @@ with tab3:
 
                     st.success(f"✅ QMD 파일 생성 완료: `{qmd_path.name}`")
 
-                    # Show QMD file download option
+                    # Read QMD content for download
                     with open(qmd_path, 'r', encoding='utf-8') as f:
                         qmd_content = f.read()
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.download_button(
-                            label="📄 QMD 파일 다운로드 (디버깅용)",
-                            data=qmd_content,
-                            file_name=f"{exp_title}_{exp_date}.qmd",
-                            mime="text/plain",
-                            use_container_width=True
-                        )
+                    # Step 2: Render to HTML and/or PDF first, collect all downloads
+                    html_content = None
+                    pdf_content = None
 
-                    # Step 2: Render to HTML and/or PDF
                     if "HTML" in output_format:
                         with st.spinner("🔄 Quarto로 HTML 렌더링 중..."):
                             try:
                                 html_path = st.session_state.renderer.render_to_html(qmd_path)
                                 with open(html_path, 'r', encoding='utf-8') as f:
                                     html_content = f.read()
-
-                                st.download_button(
-                                    label="📥 HTML 리포트 다운로드",
-                                    data=html_content,
-                                    file_name=f"{exp_title}_{exp_date}.html",
-                                    mime="text/html",
-                                    key="dl_html",
-                                    use_container_width=True
-                                )
                                 st.success("🎉 HTML 리포트 생성 완료!")
                             except Exception as render_error:
                                 st.error(f"❌ HTML 렌더링 실패: {str(render_error)}")
@@ -541,21 +535,61 @@ with tab3:
                                 pdf_path = st.session_state.renderer.render_to_pdf(qmd_path)
                                 with open(pdf_path, 'rb') as f:
                                     pdf_content = f.read()
-
-                                st.download_button(
-                                    label="📥 PDF 리포트 다운로드",
-                                    data=pdf_content,
-                                    file_name=f"{exp_title}_{exp_date}.pdf",
-                                    mime="application/pdf",
-                                    key="dl_pdf",
-                                    use_container_width=True
-                                )
                                 st.success("🎉 PDF 리포트 생성 완료!")
                             except Exception as pdf_error:
                                 st.error(f"❌ PDF 렌더링 실패: {str(pdf_error)}")
                                 st.info("💡 PDF 생성에는 LaTeX(TinyTeX 등) 설치가 필요합니다. 'quarto install tinytex' 명령어를 실행해보세요.")
 
-                    if "HTML" not in output_format and "PDF" not in output_format:
+                    # Step 3: Show all download buttons together
+                    st.markdown("### 📥 다운로드")
+
+                    download_cols = []
+                    if html_content:
+                        download_cols.append("HTML")
+                    if pdf_content:
+                        download_cols.append("PDF")
+                    download_cols.append("QMD")
+
+                    cols = st.columns(len(download_cols))
+
+                    col_idx = 0
+                    if html_content:
+                        with cols[col_idx]:
+                            st.download_button(
+                                label="📥 HTML 리포트",
+                                data=html_content,
+                                file_name=f"{exp_title}_{exp_date}.html",
+                                mime="text/html",
+                                key="dl_html",
+                                use_container_width=True
+                            )
+                        col_idx += 1
+
+                    if pdf_content:
+                        with cols[col_idx]:
+                            st.download_button(
+                                label="📥 PDF 리포트",
+                                data=pdf_content,
+                                file_name=f"{exp_title}_{exp_date}.pdf",
+                                mime="application/pdf",
+                                key="dl_pdf",
+                                use_container_width=True
+                            )
+                        col_idx += 1
+
+                    # QMD download always available
+                    with cols[col_idx]:
+                        st.download_button(
+                            label="📄 QMD 파일",
+                            data=qmd_content,
+                            file_name=f"{exp_title}_{exp_date}.qmd",
+                            mime="text/plain",
+                            key="dl_qmd",
+                            use_container_width=True,
+                            help="디버깅용 원본 파일"
+                        )
+
+                    if not html_content and not pdf_content:
                         st.info("💡 QMD 파일을 다운로드하여 수동으로 렌더링할 수 있습니다.")
 
                 except Exception as e:
