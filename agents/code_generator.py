@@ -156,9 +156,16 @@ class BioCodeGenerator:
 
             try:
                 data = json.loads(full_text)
-                code = data.get('code', '')
+                code_raw = data.get('code', '')
                 interpretation = data.get('interpretation', '')
                 warnings = data.get('warnings', '')
+
+                # Handle case where code might be returned as a list
+                if isinstance(code_raw, list):
+                    code = '\n'.join(str(item) for item in code_raw)
+                else:
+                    code = str(code_raw) if code_raw else ''
+
             except json.JSONDecodeError:
                 # Fallback: 기존의 텍스트 파싱 로직 (만약 JSON 모드가 실패할 경우 대비)
                 code_pattern = rf"```(?:{language}|[a-zA-Z]+)?(.*?)```"
