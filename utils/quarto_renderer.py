@@ -194,7 +194,15 @@ class QuartoRenderer:
         # Content Blocks
         for i, chunk in enumerate(code_chunks, 1):
             lang = chunk.get('language', 'python').lower()
-            code = chunk.get('code', '').strip()
+
+            # Handle code that might be a list or string
+            code_raw = chunk.get('code', '')
+            if isinstance(code_raw, list):
+                code = '\n'.join(str(item) for item in code_raw)
+            else:
+                code = str(code_raw) if code_raw else ''
+            code = code.strip()
+
             caption = chunk.get('caption', f'Analysis {i}')
             interpretation = chunk.get('interpretation', '')
             
