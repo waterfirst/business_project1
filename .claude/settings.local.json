@@ -10,7 +10,8 @@
       "Bash(python:*)",
       "Bash(if exist agents__pycache__ rmdir /s /q agents__pycache__)",
       "Bash(if exist __pycache__ rmdir /s /q __pycache__)",
-      "Bash(if exist utils__pycache__ rmdir /s /q utils__pycache__)"
+      "Bash(if exist utils__pycache__ rmdir /s /q utils__pycache__)",
+      "Bash(cat:*)"
     ]
   }
 }

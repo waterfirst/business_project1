@@ -25,8 +25,9 @@ class ExampleDatasets:
 
         df = pd.DataFrame(data)
         # 전체 점수 계산 (가중평균)
-        df['총점'] = (df['중간고사'] * 0.3 + df['기말고사'] * 0.4 +
-                      df['출석률'] * 0.1 + df['과제점수'] * 0.2').round(1)
+        total_score = (df['중간고사'] * 0.3 + df['기말고사'] * 0.4 +
+                      df['출석률'] * 0.1 + df['과제점수'] * 0.2)
+        df['총점'] = total_score.round(1)
 
         return df
 
