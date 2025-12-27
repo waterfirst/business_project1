@@ -326,13 +326,19 @@ fig_resid
             if not l:
                 clean_lines.append("")
                 continue
-            
+
+            # [CRITICAL FIX] from ... import ... 구문은 절대 분리하지 않음
+            # This prevents splitting valid Python import statements
+            if l.startswith("from ") and " import " in l:
+                clean_lines.append(l)
+                continue
+
             # [Aggressive Unfolding] 한 줄에 여러 키워드가 뭉친 경우 분해
             current_line = l
             while True:
                 found_kw = None
                 earliest_pos = len(current_line)
-                
+
                 # 가장 먼저 나타나는 키워드 찾기 (단, 줄 시작은 제외)
                 for kw in split_keywords:
                     pos = current_line.find(kw)
@@ -340,12 +346,12 @@ fig_resid
                         if pos < earliest_pos:
                             earliest_pos = pos
                             found_kw = kw
-                
+
                 if found_kw:
                     # 키워드 앞에서 자르기
                     prefix = current_line[:earliest_pos].strip()
                     remainder = current_line[earliest_pos:].strip()
-                    
+
                     # 프리픽스가 주석이 아니고 코드가 아니면 주석 처리
                     if prefix and not prefix.startswith("#"):
                         # 프리픽스가 순수 텍스트(한글 포함)인지 확인
@@ -353,7 +359,7 @@ fig_resid
                             clean_lines.append(f"# {prefix}")
                         else:
                             clean_lines.append(prefix)
-                    
+
                     current_line = remainder
                 else:
                     # 더 이상 찢을 키워드가 없음
@@ -366,9 +372,13 @@ fig_resid
                     break
                     
         # 3. 중복된 import 분해 (import a import b -> import a \n import b)
+        # BUT: from ... import ... 구문은 예외 처리 (이미 위에서 보호했지만 이중 체크)
         final_lines = []
         for line in clean_lines:
-            if line.count("import ") > 1 and not line.startswith("#"):
+            # [CRITICAL FIX] from ... import ... 구문은 분리하지 않음
+            if line.strip().startswith("from ") and " import " in line:
+                final_lines.append(line)
+            elif line.count("import ") > 1 and not line.startswith("#"):
                 parts = line.split("import ")
                 for p in parts:
                     if p.strip(): final_lines.append(f"import {p.strip()}")
