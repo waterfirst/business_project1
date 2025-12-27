@@ -70,9 +70,14 @@ class BioCodeGenerator:
    - 색상은 색약자도 구분 가능한 팔레트 사용 (`plotly.express.colors.qualitative.Safe`)
 
 3. **통계 분석: 쉽게 설명**:
-   - T-test, ANOVA, 상관분석 등을 수행할 때 "왜 이 검정을 하는지" 주석으로 설명
+   - T-test, ANOVA, 상관분석, 회귀분석 등을 수행할 때 "왜 이 검정을 하는지" 주석으로 설명
    - P-value < 0.05의 의미를 해석에서 친절하게 설명
    - 예: "P-value가 0.001로 0.05보다 작으므로, 두 그룹 간 차이가 통계적으로 유의미합니다"
+   - **회귀분석 시 필수 포함 사항**:
+     * 회귀식 (예: y = 2.5x + 1.3)
+     * R-squared (결정계수) - 모델 설명력
+     * 각 계수의 p-value - 통계적 유의성
+     * 잔차 플롯 - 모델 가정 검증
 
 4. **교육적 해석 (Student-Friendly Interpretation)**:
    - **무엇을 발견했나요?**: 핵심 결과를 3-5개 bullet points로 요약
@@ -85,6 +90,42 @@ class BioCodeGenerator:
    - 한 줄에 하나의 작업만 (가독성 우선)
    - 복잡한 계산은 여러 단계로 분해
    - print() 문으로 중간 결과를 보여주기
+
+**회귀분석 코드 예시 (반드시 참고):**
+```python
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+import statsmodels.api as sm
+
+# 1. 데이터 로드
+df = pd.read_csv('data.csv')
+
+# 2. 독립변수(X)와 종속변수(y) 설정
+X = df[['독립변수1', '독립변수2']]  # 사용자가 지정한 변수
+y = df['종속변수']  # 사용자가 지정한 변수
+
+# 3. 회귀모델 구축 (statsmodels - p-value 확인용)
+X_with_const = sm.add_constant(X)
+model = sm.OLS(y, X_with_const).fit()
+print(model.summary())  # 회귀식, R-squared, p-value 모두 출력
+
+# 4. 산점도 + 회귀선 시각화
+y_pred = model.predict(X_with_const)
+fig = px.scatter(df, x='독립변수1', y='종속변수', title='회귀분석 결과')
+fig.add_trace(go.Scatter(x=df['독립변수1'], y=y_pred, mode='lines', name='회귀선'))
+fig
+
+# 5. 잔차 플롯
+residuals = y - y_pred
+fig_resid = px.scatter(x=y_pred, y=residuals, title='잔차 플롯',
+                       labels={'x': '예측값', 'y': '잔차'})
+fig_resid.add_hline(y=0, line_dash='dash', line_color='red')
+fig_resid
+```
 
 **기술적 요구사항:**
 - 모든 코드는 **복사-붙여넣기 후 바로 실행 가능**해야 함
@@ -123,6 +164,13 @@ class BioCodeGenerator:
 **[사용자 요청]**
 {user_input}
 
+**[중요: 요청 분석 가이드]**
+- 사용자 요청이 "A, B에 따른 C 회귀 분석" 형태라면:
+  * A, B = 독립변수 (X)
+  * C = 종속변수 (y)
+  * 반드시 이 변수들을 정확히 사용하여 회귀모델을 구축하세요
+- 예: "dev, exp에 따른 cd 회귀 분석" → X=['dev', 'exp'], y='cd'
+
 **[분석 설정]**
 - 언어: {language.upper()}
 - 종속 변수(Target): {target_variable if target_variable else "미지정 (사용자 요청에 따라 판단)"}
@@ -133,6 +181,14 @@ class BioCodeGenerator:
 **[지시 사항]**
 1. 위 데이터 프로필을 먼저 분석하여 컬럼의 성격과 결측치 상태를 파악하세요.
 2. 요청에 가장 적합한 EDA 및 통계 분석 코드를 작성하세요.
+   - **회귀 분석 요청 시**:
+     * 사용자가 지정한 독립변수(X)와 종속변수(Y)를 정확히 사용하세요
+     * statsmodels 또는 scikit-learn으로 회귀모델 구축
+     * 회귀식(coefficients), R-squared, p-value를 반드시 출력
+     * 잔차 플롯(Residual plot)을 그려 모델 적합도를 확인
+     * 산점도에 회귀선을 함께 표시
+   - **그룹 비교 요청 시**: T-test 또는 ANOVA 수행
+   - **상관관계 요청 시**: 상관계수 행렬과 히트맵 생성
 3. 시각화는 산점도, 박스플롯 등 데이터 관계를 가장 잘 보여주는 형식을 선택하세요.
 4. 모든 코드는 실행 가능해야 하며, 데이터 로드 경로는 'data.csv'로 가정하거나 data_info에 언급된 내용을 참고하세요.
 5. 반드시 JSON 형식으로만 응답하세요.
